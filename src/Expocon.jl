@@ -2,14 +2,14 @@ __precompile__()
 module Expocon 
 
 export MultiFor
-export Lyndon, lyndon_wordsm graded_lyndon_words
+export Lyndon, lyndon_words, graded_lyndon_words
 export extend_by_rightmost_subwords
 export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
-export order_conditions_compact_splitting, order_conditions_splitting
+export order_conditions_splitting
 
 
-immutabl eLyndon
+immutable Lyndon
     s::Int
     n::Int
 end
@@ -182,27 +182,28 @@ function coeffs_prod_exps{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{
 end    
 
 
-function order_conditions_compact_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
+function order_conditions_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
     c = coeffs_prod_exps(W, G)
     for i=1:length(W)
         c[i] = c[i]-one(T)/factorial(length(W[i]))
     end
+    c
 end
 
 
 function order_conditions_splitting{T}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1})
     sa = length(a)
     sb = length(b)
-    G = Array{Tuple{T,Any},1}[]
+    G = Array{Tuple{T,Int},1}[]
     for j=1:max(sa, sb)
         if j<=sa && a[j]!=0
-            push!(G, (a[j], 0))
+            push!(G, [(a[j], 0)])
         end
         if j<=sb && b[j]!=0
-            push!(G, (b[j], 1))
+            push!(G, [(b[j], 1)])
         end
     end
-    order_conditions_compact_splitting(W, G)
+    order_conditions_splitting(W, G)
 end
 
 
