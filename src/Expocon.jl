@@ -7,6 +7,7 @@ export extend_by_rightmost_subwords
 export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
 export order_conditions_splitting
+export order_conditions_exponential
 
 
 immutable Lyndon
@@ -85,9 +86,16 @@ function commutator_length(C::Vector)
 end
 
 
-coeff(W::Array{Int,1}, C::Int) = length(W)==1&&W[1]==C?1:0    
+function coeff{R}(W::Array{Int,1}, C::Int, g::Array{R,1}=[]) 
+    if length(g)==0
+        return length(W)==1&&W[1]==C?1:0    
+    else
+        return length(W)==1?1g[C]^W[1]:0     
+    end
+end
 
-function coeff(W::Array{Int,1}, C::Vector)
+
+function coeff{R}(W::Array{Int,1}, C::Vector, g::Array{R,1}=[])
     if length(C)!=2
          error("not well-formed commutator")
     end
@@ -96,8 +104,8 @@ function coeff(W::Array{Int,1}, C::Vector)
     if l1+l2 != length(W)
         return 0
     end
-    (coeff(W[1:l1], C[1])*coeff(W[l1+1:end], C[2]) -
-     coeff(W[1:l2], C[2])*coeff(W[l2+1:end], C[1]) )      
+    (coeff(W[1:l1], C[1], g)*coeff(W[l1+1:end], C[2], g) -
+     coeff(W[1:l2], C[2], g)*coeff(W[l2+1:end], C[1], g) )      
 end
 
 
@@ -126,7 +134,7 @@ function Base.next(MF::MultiFor, k::Array{Int,1})
 end
 
 
-function coeff_exp{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1})
+function coeff_exp{T,S,R}(W::Array{Int,1}, G::Array{Tuple{T,S},1}, g::Array{R,1}=[])
     r = length(W)
     if r==0
         return one(T)
@@ -147,7 +155,7 @@ function coeff_exp{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1})
                 cc = one(T)
                 ll=1
                 for k1 in k                
-                    cc *= x[k1+1]*coeff(W[ll:ll+l[k1+1]-1], C[k1+1]) 
+                    cc *= x[k1+1]*coeff(W[ll:ll+l[k1+1]-1], C[k1+1], g) 
                     ll += l[k1+1]
                 end        
                 #println("coeff = ", cc)
@@ -159,7 +167,7 @@ function coeff_exp{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1})
 end
 
 
-function coeffs_prod_exps{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
+function coeffs_prod_exps{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
     W1 = extend_by_rightmost_subwords(W)
     m = length(W1)
     J = length(G)
@@ -172,7 +180,7 @@ function coeffs_prod_exps{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{
                 r = length(W1[k])-length(W1[l])
                 if r>=0 && W1[k][r+1:end]==W1[l]
                     w = W1[k][1:r]
-                    M[k,l]  = coeff_exp(w, G[j])
+                    M[k,l]  = coeff_exp(w, G[j], g)
                 end
             end
         end 
@@ -182,16 +190,16 @@ function coeffs_prod_exps{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{
 end    
 
 
-function order_conditions_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
-    c = coeffs_prod_exps(W, G)
+function order_conditions_splitting{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
+    c = coeffs_prod_exps(W, G, g)
     for i=1:length(W)
-        c[i] = c[i]-one(T)/factorial(length(W[i]))
+        c[i] = c[i] - one(T)/factorial(length(W[i]))
     end
     c
 end
 
 
-function order_conditions_splitting{T}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1})
+function order_conditions_splitting{T, R}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1}, g::Array{R,1}=[])
     sa = length(a)
     sb = length(b)
     G = Array{Tuple{T,Int},1}[]
@@ -203,10 +211,18 @@ function order_conditions_splitting{T}(W::Array{Array{Int64,1},1}, a::Array{T, 1
             push!(G, [(b[j], 1)])
         end
     end
-    order_conditions_splitting(W, G)
+    order_conditions_splitting(W, G, g)
 end
 
 
+function order_conditions_exponential{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
+    c = coeffs_prod_exps(W, G, g)
+    for i=1:length(W)
+        w = W[i]
+        c[i] = c[i] - one(T)/prod([sum(w[j:end]+1) for j=1:length(w)])
+    end
+    c
+end
 
 
 end #Expocon
