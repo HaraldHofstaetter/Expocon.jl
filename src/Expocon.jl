@@ -8,6 +8,7 @@ export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
 export order_conditions_splitting
 export order_conditions_exponential
+export order_conditions_exponential_legendre
 
 
 immutable Lyndon
@@ -190,8 +191,8 @@ function coeffs_prod_exps{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tupl
 end    
 
 
-function order_conditions_splitting{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
-    c = coeffs_prod_exps(W, G, g)
+function order_conditions_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
+    c = coeffs_prod_exps(W, G)
     for i=1:length(W)
         c[i] = c[i] - one(T)/factorial(length(W[i]))
     end
@@ -199,7 +200,7 @@ function order_conditions_splitting{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{
 end
 
 
-function order_conditions_splitting{T, R}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1}, g::Array{R,1}=[])
+function order_conditions_splitting{T}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1})
     sa = length(a)
     sb = length(b)
     G = Array{Tuple{T,Int},1}[]
@@ -211,7 +212,7 @@ function order_conditions_splitting{T, R}(W::Array{Array{Int64,1},1}, a::Array{T
             push!(G, [(b[j], 1)])
         end
     end
-    order_conditions_splitting(W, G, g)
+    order_conditions_splitting(W, G)
 end
 
 
@@ -220,6 +221,24 @@ function order_conditions_exponential{T,S,R}(W::Array{Array{Int64,1},1}, G::Arra
     for i=1:length(W)
         w = W[i]
         c[i] = c[i] - one(T)/prod([sum(w[j:end]+1) for j=1:length(w)])
+    end
+    c
+end
+
+
+
+function order_conditions_exponential_legendre{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
+    c = coeffs_prod_exps(W, G)
+    p = maximum([sum(w) for w in W])
+    Cinv = inv([(2*n+1)*(-1)^n*sum([(-1)^k//(k+m+1)*binomial(n, k)*binomial(n+k, k) for k=0:n]) for n=0:p-1,m=0:p-1])
+    for i=1:length(W)
+        w = W[i]
+        l = length(w)
+        s = zero(T)
+        for v in MultiFor(fill(p-1,l))
+            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
+        end
+        c[i] -= s
     end
     c
 end
