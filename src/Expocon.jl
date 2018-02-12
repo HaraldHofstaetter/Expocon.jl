@@ -3,6 +3,7 @@ module Expocon
 
 export MultiFor
 export Lyndon, lyndon_words, graded_lyndon_words
+export bracketing, lyndon_basis, graded_lyndon_basis
 export extend_by_rightmost_subwords
 export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
@@ -65,6 +66,38 @@ function graded_lyndon_words(n::Integer)
     end    
     W1
 end
+
+
+function bracketing(w, W; square_brackets::Bool=false)
+    if length(w) == 1
+        return w[1]
+    end
+    k0 = 0
+    for k=2:length(w)
+        if findfirst(W, w[k:end])>0
+            k0 = k
+            break
+        end
+    end    
+    if square_brackets
+	return Any[bracketing(w[1:k0-1], W, square_brackets=square_brackets), 
+	           bracketing(w[k0:end], W, square_brackets=square_brackets)]
+    else
+        return (bracketing(w[1:k0-1], W, square_brackets=square_brackets), 
+	        bracketing(w[k0:end], W, square_brackets=square_brackets))
+    end
+end
+
+function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=false) 
+    W = lyndon_words(s, n)
+    [bracketing(w, W, square_brackets=square_brackets) for w in W]
+end
+
+function graded_lyndon_basis(n::Integer; square_brackets::Bool=false) 
+    W = graded_lyndon_words(n)
+    [bracketing(w, W, square_brackets=square_brackets) for w in W]
+end
+
 
 function extend_by_rightmost_subwords(W::Array{Array{Int64,1},1})
     WW=Dict{Array{Int64,1},Int}(Int64[]=>1)
