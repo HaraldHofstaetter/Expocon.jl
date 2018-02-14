@@ -11,7 +11,7 @@ export order_conditions_splitting
 export order_conditions_exponential
 export order_conditions_exponential_legendre
 export legendre, dlegendre
-export gaus_nodes, gauss_nodes_and_weights
+export gauss_nodes, gauss_nodes_and_weights
 export order_conditions_exponential_gauss
 
 
@@ -299,20 +299,20 @@ function gauss_nodes_and_weights(n)
 end
 
 
-function order_conditions_exponential_gauss{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
+function order_conditions_exponential_gauss{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, q::Integer)
     c = coeffs_prod_exps(W, G)
     c1 = zeros(T, length(W))
     p = maximum([length(w) for w in W])
     C = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
-    x,g = gauss_nodes_and_weights(p)
-    C1 = [one(giac)*(2*n-1)*g[m]*legendre(n-1,x[m]) for m=1:p, n=1:p]
+    x,g = gauss_nodes_and_weights(q)
+    C1 = [one(giac)*(2*n-1)*g[m]*legendre(n-1,x[m]) for m=1:q, n=1:p]
     for i=1:length(W)
         y = W[i]
         l = length(y)
         s = zero(T)
-        for w in MultiFor(fill(p-1,l))
+        for w in MultiFor(fill(l-1,l))
             s1 = zero(T)
-            for v in MultiFor(fill(p-1,l))
+            for v in MultiFor(fill(l-1,l))
                 s1 += prod([C[v[j]+1,w[j]+1]/sum([v[i]+1 for i=j:l]) for j=1:l])
             end
             s += s1*prod([C1[y[j],w[j]+1] for j=1:l])
