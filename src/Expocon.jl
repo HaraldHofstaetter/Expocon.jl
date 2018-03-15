@@ -266,13 +266,12 @@ end
 function order_conditions_exponential_legendre{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
     c = coeffs_prod_exps(W, G)
     p = maximum([sum(w) for w in W])
-    #Cinv = inv([(2*n+1)*(-1)^n*sum([(-1)^k//(k+m+1)*binomial(n, k)*binomial(n+k, k) for k=0:n]) for n=0:p-1,m=0:p-1])
     Cinv = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
     for i=1:length(W)
         w = W[i]
         l = length(w)
         s = zero(T)
-        for v in MultiFor(fill(p-1,l))
+        for v in MultiFor(w-1)
             s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
         end
         c[i] -= s
