@@ -231,15 +231,11 @@ function coeffs_prod_exps{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tupl
     c = [c[findfirst(W1, w)] for w in W]
 end    
 
+
 rhs_exponential_splitting(W::Array{Array{Int64,1},1}) = [1//factorial(length(w)) for w in W]
 
 function order_conditions_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
     coeffs_prod_exps(W, G) - rhs_exponential_splitting(W)
-#    c = coeffs_prod_exps(W, G)
-#    for i=1:length(W)
-#        c[i] = c[i] - one(T)/factorial(length(W[i]))
-#    end
-#    c
 end
 
 
@@ -271,12 +267,6 @@ end
 
 function order_conditions_exponential_taylor{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
     coeffs_prod_exps(W, G, g) - rhs_exponential_taylor(W)
-#    c = coeffs_prod_exps(W, G, g)
-#    for i=1:length(W)
-#        w = W[i]
-#        c[i] = c[i] - one(T)/prod([sum(w[j:end]+1) for j=1:length(w)])
-#    end
-#    c
 end
 
 
@@ -297,23 +287,8 @@ function rhs_exponential_legendre(W::Array{Array{Int64,1},1})
     c
 end
 
-
-
 function order_conditions_exponential_legendre{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
     coeffs_prod_exps(W, G) - rhs_exponential_legendre(W)
-#    c = coeffs_prod_exps(W, G)
-#    p = maximum([sum(w) for w in W])
-#    Cinv = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
-#    for i=1:length(W)
-#        w = W[i]
-#        l = length(w)
-#        s = zero(T)
-#        for v in MultiFor(w-1)
-#            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
-#        end
-#        c[i] -= s
-#    end
-#    c
 end
 
 
