@@ -16,6 +16,8 @@ export order_conditions_exponential_legendre
 export legendre, dlegendre
 export gauss_nodes, gauss_nodes_and_weights
 export order_conditions_exponential_gauss
+export order_conditions_exponential_nodes
+export coeff_trans
 
 
 immutable Lyndon
@@ -355,5 +357,71 @@ function order_conditions_exponential_gauss{T,S}(W::Array{Array{Int64,1},1}, G::
     end
     c1
 end                
+
+function order_conditions_exponential_nodes{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Vector)
+    c = coeffs_prod_exps(W, G)    
+    c1 = zeros(T, length(W))
+    p = maximum([length(w) for w in W])
+    q = length(g)
+    Cinv = to_julia(giac(:inverse, [g[m]^n for m=1:q, n=0:q])) 
+    Cinv = [Cinv[i][j] for i=1:q, j=1:q]
+    for i=1:length(W)
+        w = W[i]
+        l = length(w)
+        s = zero(giac)
+        for v in MultiFor(fill(q-1,l))
+            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
+        end
+        c1[i] = c[i]-s
+    end
+    c1
+end        
+
+
+
+coeff_trans(W::Array{Int,1}, C::Int, T::Matrix) = length(W)==1?T[W[1], C]:0
+
+function coeff_trans(W::Array{Int,1}, C::Vector, T::Matrix)
+    if length(C)!=2
+         error("not well-formed commutator")
+    end
+    l1 = commutator_length(C[1])
+    l2 = commutator_length(C[2])
+    if l1+l2 != length(W)
+        return 0
+    end
+    (coeff_trans(W[1:l1], C[1], T)*coeff_trans(W[l1+1:end], C[2], T) -
+     coeff_trans(W[1:l2], C[2], T)*coeff_trans(W[l2+1:end], C[1], T) )
+end
+
+function coeff_trans{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1}, TM::Matrix)
+    c = zero(T)
+    for (c1, C) in G
+        c += c1*coeff_trans(W, C, TM)
+    end
+    c
+end
+
+
+leading_word(C::Int)=[C]
+leading_word(C::Vector) = vcat(leading_word(C[1]), leading_word(C[2]))
+
+
+function transform{T,S}(B::Vector, G::Array{Tuple{T,S},1}, TM::Matrix)
+    G1 = Tuple{T,Any}[]
+    for b in B
+        W = leading_word(b)
+        h = coeff_trans(W, G, TM)
+        if !iszero(h)
+            push!(G1, (simplify(h), b))
+        end
+    end
+    G1
+end
+
+function transform{T,S}(B::Vector, G::Array{Array{Tuple{T,S},1}}, TM::Matrix)
+    Array{Tuple{T,S},1}[transform(B, g, TM) for g in G]
+end
+
 
 end #Expocon
