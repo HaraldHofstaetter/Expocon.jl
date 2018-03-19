@@ -9,9 +9,11 @@ export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
 export rhs_splitting
 export rhs_exponential_taylor
+export rhs_exponential_taylor_symmetric
 export rhs_exponential_legendre
 export order_conditions_splitting
 export order_conditions_exponential_taylor
+export order_conditions_exponential_taylor_symmetric
 export order_conditions_exponential_legendre
 export legendre, dlegendre
 export gauss_nodes, gauss_nodes_and_weights
@@ -59,11 +61,11 @@ function graded_lyndon_words(n::Integer)
     for w in W
         if w!=[1]
             w1 = Int[]
-            c=0
+            c=1
             for i in reverse(w)
                 if i==0
                     push!(w1, c)
-                    c = 0
+                    c = 1
                 else
                     c+=1
                 end
@@ -260,13 +262,35 @@ function rhs_exponential_taylor(W::Array{Array{Int64,1},1})
     p = maximum([sum(w) for w in W])  
     for i=1:length(W)
         w = W[i]
-        c[i] = one(T)/prod([sum(w[j:end]+1) for j=1:length(w)])
+        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
     end
     c
 end    
 
 function order_conditions_exponential_taylor{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
     coeffs_prod_exps(W, G, g) - rhs_exponential_taylor(W)
+end
+
+
+function rhs_exponential_taylor_symmetric(W::Array{Array{Int64,1},1})
+    T = Rational{Int}    
+    c = zeros(T, length(W))
+    p = maximum([sum(w) for w in W])
+    Cinv = T[(-1)^(m+n)*(n>=m?binomial(n,m)//2^(n-m):0) for m=0:p-1, n=0:p-1]
+    for i=1:length(W)
+        w = W[i]
+        l = length(w)
+        s = zero(T)
+        for v in MultiFor(w-1)
+            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
+        end
+        c[i] = s
+    end
+    c
+end
+
+function order_conditions_exponential_taylor_symmetric{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
+    coeffs_prod_exps(W, G, g) - rhs_exponential_taylor_symmetric(W)
 end
 
 
