@@ -7,6 +7,7 @@ export bracketing, lyndon_basis, graded_lyndon_basis
 export extend_by_rightmost_subwords
 export commutator_length
 export coeff, coeff_exp, coeffs_prod_exps
+export leading_word
 export rhs_splitting
 export rhs_exponential_taylor
 export rhs_exponential_taylor_symmetric
@@ -320,7 +321,12 @@ using Giac
 
 legendre{T}(n::Integer, x::T) = (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*(-1)^k*x^k for k=0:n])
 
-dlegendre{T}(n::Integer, x::T) = (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*(-1)^k*k*x^(k-1) for k=1:n])
+function dlegendre{T}(n::Integer, x::T, q::Integer=1) 
+    if q>n
+        return zero(T)
+    end    
+    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*x^(k-q) for k=0:n])
+end
 
 function gauss_nodes(n::Integer) 
     x = giac_identifier("__x__")
