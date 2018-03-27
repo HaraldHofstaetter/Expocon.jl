@@ -5,7 +5,7 @@ export MultiFor
 export Lyndon, lyndon_words, graded_lyndon_words
 export bracketing, lyndon_basis, graded_lyndon_basis
 export extend_by_rightmost_subwords
-export commutator_length
+export commutator_length, commutator_contains
 export coeff, coeff_exp, coeffs_prod_exps
 export leading_word
 export rhs_splitting
@@ -110,6 +110,46 @@ function graded_lyndon_basis(n::Integer; square_brackets::Bool=false)
 end
 
 
+function right_norm_basis(w)
+    l = length(w)
+    if sum(w)==l-1 
+        return reverse(w)
+    end
+    s=2
+    m=0
+    while w[s]==1
+        m+=1
+        s+=1
+    end
+    b = vcat(ones(Int, 2*m+1), 0)
+    while s<l
+        n=0
+        while true
+            s+=m+1
+            if w[s]==1
+                break;
+            end
+            n+=1;
+        end
+        k=1
+        while s<=l && w[s]==1
+            s+=1
+            k+=1
+        end
+        b=vcat(0,b)
+        for n1=1:n
+            b=vcat(0, ones(Int,m), b)
+        end
+        if s<l
+            b=vcat(ones(Int,k),b)
+        else
+            b=vcat(ones(Int,k-m-1),b)
+        end        
+    end
+    b
+end
+
+
 function extend_by_rightmost_subwords(W::Array{Array{Int64,1},1})
     WW=Dict{Array{Int64,1},Int}(Int64[]=>1)
     for w in W 
@@ -131,6 +171,20 @@ function commutator_length(C::Vector)
 end
 
 
+commutator_contains(C1, C2::Int) = C1==C2
+
+function commutator_contains(C1, C2::Vector)
+    if length(C2)!=2
+         error("not well-formed commutator")
+    end    
+    C1==C2||commutator_contains(C1, C2[1])||commutator_contains(C1, C2[2])
+end
+
+
+leading_word(C::Int)=[C]
+leading_word(C::Vector) = vcat(leading_word(C[1]), leading_word(C[2]))
+
+
 function coeff{R}(W::Array{Int,1}, C::Int, g::Array{R,1}=[]) 
     if length(g)==0
         return length(W)==1&&W[1]==C?1:0    
@@ -138,7 +192,6 @@ function coeff{R}(W::Array{Int,1}, C::Int, g::Array{R,1}=[])
         return length(W)==1?1g[C]^W[1]:0     
     end
 end
-
 
 function coeff{R}(W::Array{Int,1}, C::Vector, g::Array{R,1}=[])
     if length(C)!=2
@@ -406,10 +459,6 @@ function coeff_trans{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1}, TM::Matrix)
     end
     c
 end
-
-
-leading_word(C::Int)=[C]
-leading_word(C::Vector) = vcat(leading_word(C[1]), leading_word(C[2]))
 
 
 function transform{T,S}(B::Vector, G::Array{Tuple{T,S},1}, TM::Matrix)
