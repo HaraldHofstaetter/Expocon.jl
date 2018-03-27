@@ -110,7 +110,7 @@ function graded_lyndon_basis(n::Integer; square_brackets::Bool=false)
 end
 
 
-function right_norm_basis(w)
+function right_normed_basis(w)
     l = length(w)
     if sum(w)==l-1 
         return reverse(w)
