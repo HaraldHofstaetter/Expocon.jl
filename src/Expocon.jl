@@ -4,6 +4,7 @@ module Expocon
 export MultiFor
 export Lyndon, lyndon_words, graded_lyndon_words
 export bracketing, lyndon_basis, graded_lyndon_basis
+export lyndon2rightnormed
 export extend_by_rightmost_subwords
 export commutator_length, commutator_contains
 export coeff, coeff_exp, coeffs_prod_exps
@@ -48,16 +49,18 @@ end
     
 Base.done(L::Lyndon, w::Vector{Int}) = w == [L.s-1]
 
-function lyndon_words(s::Integer, n::Integer)
+function lyndon_words(s::Integer, n::Integer; odd_only::Bool=false, all_lower::Bool=true)
     r = Array{Int,1}[]
-    for l in Lyndon(s,n)
-        push!(r, l)
+    for w in Lyndon(s,n)
+        if (all_lower || length(w)==n) && (!odd_only || isodd(length(w)))
+            push!(r, w)
+        end
     end
     sort(r, lt=(x,y)->length(x)<length(y))
 end
 
-function graded_lyndon_words(n::Integer)
-    W = lyndon_words(2, n)
+function graded_lyndon_words(n::Integer; odd_only::Bool=false, all_lower::Bool=true)
+    W = lyndon_words(2, n, odd_only=odd_only, all_lower=all_lower)
     W1 = Array{Int,1}[]
     for w in W
         if w!=[1]
@@ -79,7 +82,7 @@ function graded_lyndon_words(n::Integer)
 end
 
 
-function bracketing(w, W; square_brackets::Bool=false)
+function bracketing(w, W; square_brackets::Bool=true)
     if length(w) == 1
         return w[1]
     end
@@ -99,18 +102,20 @@ function bracketing(w, W; square_brackets::Bool=false)
     end
 end
 
-function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=false) 
+function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, odd_only::Bool=false, all_lower::Bool=true) 
     W = lyndon_words(s, n)
-    [bracketing(w, W, square_brackets=square_brackets) for w in W]
+    [bracketing(w, W, square_brackets=square_brackets) for w in W if
+        (all_lower || length(w)==n) && (!odd_only || isodd(length(w)))]
 end
 
-function graded_lyndon_basis(n::Integer; square_brackets::Bool=false) 
+function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, odd_only::Bool=false, all_lower::Bool=true)
     W = graded_lyndon_words(n)
-    [bracketing(w, W, square_brackets=square_brackets) for w in W]
+    [bracketing(w, W, square_brackets=square_brackets) for w in W if
+        (all_lower || sum(w)==n) && (!odd_only || isodd(sum(w)))]
 end
 
 
-function right_normed_basis(w)
+function lyndon2rightnormed(w)
     l = length(w)
     if sum(w)==l-1 
         return reverse(w)
