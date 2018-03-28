@@ -53,7 +53,7 @@ Base.done(L::Lyndon, w::Vector{Int}) = w == [L.s-1]
 function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
     r = Array{Int,1}[]
     for w in Lyndon(s,n)
-        if (all_lower || length(w)==n) && (!odd_terms_only || isodd(length(w)))
+        if (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))
             push!(r, w)
         end
     end
@@ -116,71 +116,125 @@ function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, odd_terms_o
 end
 
 
-function rightnormed_bracketing(w, square_brackets::Bool=true)
+function rightnormed_bracketing(w; square_brackets::Bool=true)
     if length(w) == 1
         return w[1]
     end
     if square_brackets
-        return Any[w[1], rightnormed_bracketing(w[2:end], W, square_brackets=square_brackets)]
+        return Any[w[1], rightnormed_bracketing(w[2:end], square_brackets=square_brackets)]
     else
-        return (w[1], rightnormed_bracketing(w[2:end], W, square_brackets=square_brackets))
+        return (w[1], rightnormed_bracketing(w[2:end], square_brackets=square_brackets))
     end
 end
-               
 
-function lyndon2rightnormed(w)
-    l = length(w)
-    if l==1
-        return w
-    end
-    if sum(w)==l-1 
-        return reverse(w)
-    end
-    s = 2
-    m = 0
-    while w[s]==1
-        m += 1
+
+function analyze_lyndon_word(w)
+    #println(w)
+    q = maximum(w)
+    A = Dict{Array{Int64,1}, Int}([[x]=>x for x in 1:q])
+    w1 = Int[]
+    
+    lw = length(w)
+    s = 1
+    m1 = 1
+    m2 = 0
+    
+    # get a
+    a = minimum(w) 
+    assert(w[s]==a)
+    
+    #get av
+    s += 1
+    while s<=lw && w[s]!=a
         s += 1
     end
-    b = vcat(ones(Int, 2*m+1), 0)
-    while s<l
-        n=0
-        while true
-            if s+m>=l || w[s+m+1]==1
-                s+=1;
-                break;
-            end
-            s += m+1
+    v = w[2:s-1]   
+    av = vcat(a,v)  
+    #println("a=",a)
+    #println("v=",v)
+    lav = length(av)  
+    while s<=lw
+        if m2!=0 # do not change m2 in 1st iteration
+            m1 = s
+        end
+        # get n
+        n = 0
+        while s+lav<=lw && w[s+lav]==a && w[s:s+lav-1]==av     
+            s += lav
             n += 1
         end
-        k = 0
-        while s<=l && w[s]==1
-            s += 1
-            k += 1
-        end
-        b = vcat(0,b)
-        for n1 = 1:n
-            b = vcat(0, ones(Int,m), b)
-        end
-        if s<l
-            b = vcat(ones(Int,k),b)
+        #println("s=",s ," n=", n)
+        assert(w[s]==a)
+        s+=1     
+    
+        #get uu
+        k = findnext(w, a, s)
+        if k>0
+            uu = w[s:k-1]
+            s = k
         else
-            b = vcat(ones(Int,k-m-1),b)
-        end        
-    end
-    b
+            uu = w[s:end]
+            s = lw+1
+        end
+        #do something with uu 
+        j = 1
+        while !(lexless(v,uu[1:j])&&!lexless(v,uu[1:j-1]))
+            j += 1
+        end
+        u = uu[1:j]
+        u1 = uu[j+1:end]  
+        m2 = s-length(u1)-1
+        x = get!(A, w[m1:m2]) do
+            q += 1
+        end
+        w1 = vcat(w1, x, u1)
+        #println("n=",n," uu=",uu, " u=",u, " u1=",u1)
+        #println("A_=", w[m1:m2])
+    end   
+    #println("w1=", w1)
+    pp = invperm([A[x] for x in sort(collect(keys(A)), lt=lexless)])
+    w2 = [pp[x] for x in  w1]
+    tt = fill(Int[],q)
+    for (x,y) in A
+        tt[pp[y]] = x
+    end    
+    #println("---------------------")
+    w2, tt
 end
 
-function rightnormed_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
-    if (s!=2)
-        error("only case s=2 implemented.")
+
+function lyndon2rightnormed(w)
+    aa = minimum(w)
+    k=0 # number of occurences of a in w
+    for x in w
+        if x==aa
+            k+=1
+        end
     end
-    W = lyndon_words(s, n, odd_terms_only=odd_terms_only, all_lower_tersm=all_lower_term)
+    if k==1
+        return reverse(w)
+    end
+    w_1, tt = analyze_lyndon_word(w)
+    u_1 = lyndon2rightnormed(w_1)
+    y = tt[u_1[end]]
+    a = y[1] 
+    k0 = findnext(y, a, 2)
+    k1 = findlast(y, a)
+    v = y[2:k0-1]
+    avn = y[k0:k1-1]
+    u1 = y[k1+1:end]
+    u = vcat(tt[u_1[1:end-1]]...,
+             avn, a, u1, reverse(v), a)
+end
+
+
+function rightnormed_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
+    W = lyndon_words(s, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
     lyndon2rightnormed.(W) 
 end
 
 function rightnormed_basis(s::Integer, n::Integer;  square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
-    W = rightnormed_words(s, n, odd_terms_only=odd_terms_only, all_lower_tersm=all_lower_term)
+    W = rightnormed_words(s, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
     [rightnormed_bracketing(w, square_brackets=square_brackets) for w in W]
 end
 
