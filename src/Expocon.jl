@@ -4,7 +4,8 @@ module Expocon
 export MultiFor
 export Lyndon, lyndon_words, graded_lyndon_words
 export bracketing, lyndon_basis, graded_lyndon_basis
-export lyndon2rightnormed
+export rightnormed_bracketing, lyndon2rightnormed
+export rightnormed_words, rightnormed_basis
 export extend_by_rightmost_subwords
 export commutator_length, commutator_contains
 export coeff, coeff_exp, coeffs_prod_exps
@@ -49,10 +50,10 @@ end
     
 Base.done(L::Lyndon, w::Vector{Int}) = w == [L.s-1]
 
-function lyndon_words(s::Integer, n::Integer; odd_only::Bool=false, all_lower::Bool=true)
+function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
     r = Array{Int,1}[]
     for w in Lyndon(s,n)
-        if (all_lower || length(w)==n) && (!odd_only || isodd(length(w)))
+        if (all_lower || length(w)==n) && (!odd_terms_only || isodd(length(w)))
             push!(r, w)
         end
     end
@@ -60,7 +61,7 @@ function lyndon_words(s::Integer, n::Integer; odd_only::Bool=false, all_lower::B
 end
 
 function graded_lyndon_words(n::Integer; odd_only::Bool=false, all_lower::Bool=true)
-    W = lyndon_words(2, n, odd_only=odd_only, all_lower=all_lower)
+    W = lyndon_words(2, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
     W1 = Array{Int,1}[]
     for w in W
         if w!=[1]
@@ -102,57 +103,87 @@ function bracketing(w, W; square_brackets::Bool=true)
     end
 end
 
-function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, odd_only::Bool=false, all_lower::Bool=true) 
+function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
     W = lyndon_words(s, n)
     [bracketing(w, W, square_brackets=square_brackets) for w in W if
-        (all_lower || length(w)==n) && (!odd_only || isodd(length(w)))]
+        (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))]
 end
 
-function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, odd_only::Bool=false, all_lower::Bool=true)
+function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true)
     W = graded_lyndon_words(n)
     [bracketing(w, W, square_brackets=square_brackets) for w in W if
-        (all_lower || sum(w)==n) && (!odd_only || isodd(sum(w)))]
+        (all_lower_terms || sum(w)==n) && (!odd_terms_only || isodd(sum(w)))]
 end
 
+
+function rightnormed_bracketing(w, square_brackets::Bool=true)
+    if length(w) == 1
+        return w[1]
+    end
+    if square_brackets
+        return Any[w[1], rightnormed_bracketing(w[2:end], W, square_brackets=square_brackets)]
+    else
+        return (w[1], rightnormed_bracketing(w[2:end], W, square_brackets=square_brackets))
+    end
+end
+               
 
 function lyndon2rightnormed(w)
     l = length(w)
+    if l==1
+        return w
+    end
     if sum(w)==l-1 
         return reverse(w)
     end
-    s=2
-    m=0
+    s = 2
+    m = 0
     while w[s]==1
-        m+=1
-        s+=1
+        m += 1
+        s += 1
     end
     b = vcat(ones(Int, 2*m+1), 0)
     while s<l
         n=0
         while true
-            s+=m+1
-            if w[s]==1
+            if s+m>=l || w[s+m+1]==1
+                s+=1;
                 break;
             end
-            n+=1;
+            s += m+1
+            n += 1
         end
-        k=1
+        k = 0
         while s<=l && w[s]==1
-            s+=1
-            k+=1
+            s += 1
+            k += 1
         end
-        b=vcat(0,b)
-        for n1=1:n
-            b=vcat(0, ones(Int,m), b)
+        b = vcat(0,b)
+        for n1 = 1:n
+            b = vcat(0, ones(Int,m), b)
         end
         if s<l
-            b=vcat(ones(Int,k),b)
+            b = vcat(ones(Int,k),b)
         else
-            b=vcat(ones(Int,k-m-1),b)
+            b = vcat(ones(Int,k-m-1),b)
         end        
     end
     b
 end
+
+function rightnormed_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
+    if (s!=2)
+        error("only case s=2 implemented.")
+    end
+    W = lyndon_words(s, n, odd_terms_only=odd_terms_only, all_lower_tersm=all_lower_term)
+    lyndon2rightnormed.(W) 
+end
+
+function rightnormed_basis(s::Integer, n::Integer;  square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
+    W = rightnormed_words(s, n, odd_terms_only=odd_terms_only, all_lower_tersm=all_lower_term)
+    [rightnormed_bracketing(w, square_brackets=square_brackets) for w in W]
+end
+
 
 
 function extend_by_rightmost_subwords(W::Array{Array{Int64,1},1})
