@@ -468,7 +468,7 @@ function dlegendre{T}(n::Integer, x::T, q::Integer=1)
     if q>n
         return zero(T)
     end    
-    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*x^(k-q) for k=0:n])
+    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*x^(k-q) for k=q:n])
 end
 
 function gauss_nodes(n::Integer) 
