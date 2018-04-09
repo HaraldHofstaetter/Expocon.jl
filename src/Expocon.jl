@@ -50,7 +50,8 @@ end
     
 Base.done(L::Lyndon, w::Vector{Int}) = w == [L.s-1]
 
-function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
+function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, 
+                      all_lower_terms::Bool=true)
     r = Array{Int,1}[]
     for w in Lyndon(s,n)
         if (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))
@@ -60,11 +61,12 @@ function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lo
     sort(r, lt=(x,y)->length(x)<length(y))
 end
 
-function graded_lyndon_words(n::Integer; odd_only::Bool=false, all_lower::Bool=true)
+function graded_lyndon_words(n::Integer; odd_terms_only::Bool=false, 
+                             all_lower_terms::Bool=true, max_generator_order::Integer=n)
     W = lyndon_words(2, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
     W1 = Array{Int,1}[]
     for w in W
-        if w!=[1]
+        if w!=[1] 
             w1 = Int[]
             c=1
             for i in reverse(w)
@@ -75,8 +77,9 @@ function graded_lyndon_words(n::Integer; odd_only::Bool=false, all_lower::Bool=t
                     c+=1
                 end
             end
-            w1 = reverse(w1)    
-            push!(W1, w1)
+            if maximum(w1) <= max_generator_order
+                push!(W1, reverse(w1))
+            end
         end
     end    
     W1
@@ -103,16 +106,20 @@ function bracketing(w, W; square_brackets::Bool=true)
     end
 end
 
-function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
+function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, 
+                      odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
     W = lyndon_words(s, n)
     [bracketing(w, W, square_brackets=square_brackets) for w in W if
         (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))]
 end
 
-function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true)
+function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, 
+                             odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
+                             max_generator_order::Integer=n)
     W = graded_lyndon_words(n)
     [bracketing(w, W, square_brackets=square_brackets) for w in W if
-        (all_lower_terms || sum(w)==n) && (!odd_terms_only || isodd(sum(w)))]
+        (all_lower_terms || sum(w)==n) && (!odd_terms_only || isodd(sum(w)))
+       &&  maximum(w)<=max_generator_order ]
 end
 
 
