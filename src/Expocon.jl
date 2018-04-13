@@ -60,7 +60,7 @@ function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lo
     sort(r, lt=(x,y)->length(x)<length(y))
 end
 
-function graded_lyndon_words(n::Integer; odd_only::Bool=false, all_lower::Bool=true)
+function graded_lyndon_words(n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
     W = lyndon_words(2, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
     W1 = Array{Int,1}[]
     for w in W
@@ -462,13 +462,13 @@ end
 
 using Giac
 
-legendre{T}(n::Integer, x::T) = (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*(-1)^k*x^k for k=0:n])
+legendre{T}(n::Integer, x::T) = (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*(-1)^k*(k==0?1:x^k) for k=0:n])
 
 function dlegendre{T}(n::Integer, x::T, q::Integer=1) 
     if q>n
         return zero(T)
     end    
-    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*x^(k-q) for k=q:n])
+    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*(k==q?1:x^(k-q)) for k=q:n])
 end
 
 function gauss_nodes(n::Integer) 
