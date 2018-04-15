@@ -10,7 +10,7 @@ export extend_by_rightmost_subwords
 export commutator_length, commutator_contains
 export coeff, coeff_exp, coeffs_prod_exps
 export leading_word
-export rhs_splitting
+export rhs_exponential_splitting
 export rhs_exponential_taylor
 export rhs_exponential_taylor_symmetric
 export rhs_exponential_legendre
