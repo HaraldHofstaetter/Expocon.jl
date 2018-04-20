@@ -1,8 +1,10 @@
+__precompile__()
 module Expocon
 
 import 
 Base: (*), /, +, -, show, convert, zero, one
 
+export MultiFor
 export Element, Generator, SimpleCommutator, Commutator
 export Exponential, Product, Id, Term, LinearCombination
 export ZeroElement
@@ -11,7 +13,7 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export coeff
+export is_pure_commutator, coeff
 
 abstract type Element end
 
@@ -56,10 +58,11 @@ const Id = Product([])
 one(::Type{T}) where {T<:Element} = Id
 one(x::T) where {T<:Element} = one(T)
 
-
 *(p::Product, x::Element) = Product(vcat(p.p, x))
 *(x::Element, p::Product) = Product(vcat(x, p.p))
-*(x::Vararg{Element}) = Product([x...])
+*(p1::Product, p2::Product) = Product(vcat(p1.p, p2.p))
+*(e1::Element, e2::Element) = Product([e1, e2])
+#*(x::Vararg{Element}) = Product([x...])
 
 function Base.show(io::IO, p::Product) 
     if length(p.p)==0
@@ -91,9 +94,9 @@ Base.convert(::Type{Term}, t::Term) = t
 Base.convert(::Type{Term}, e::Element) = Term(1, e)
 
 *(c, e::Element) = Term(c,e)
-#*(e::Element, c) = Term(c,e)
+*(e::Element, c) = Term(c,e)
 *(c, t::Term) = Term(c*t.c,t.e)
-#*(t::Term, c) = Term(c*t.c,t.e)
+*(t::Term, c) = Term(c*t.c,t.e)
 
 -(t::Term) = Term(-t.c, t.e)
 -(e::Element) = Term(-1, e)
@@ -142,7 +145,11 @@ function *(c, x::LinearCombination)
     end
 end
 
-#*(x::LinearCombination, c) = *(c,x)
+*(x::LinearCombination, c) = *(c,x)
+*(e::Element, x::LinearCombination) = Product([e, x])
+*(x::LinearCombination, e::Element) = Product([x, e])
+*(t::Term, x::LinearCombination) = Product([t, x])
+*(x::LinearCombination, t::Term) = Product([x, t])
 
 function +(x::LinearCombination, y::LinearCombination)
     r = copy(x.l)
@@ -249,6 +256,7 @@ end
 
 -(e::Element, x::LinearCombination) = -(convert(Term, e), x)
 
+terms(e::Element) = [Term(e)]
 terms(x::LinearCombination) = [Term(c, e) for (e,c) in x.l]
 
 function Base.show(io::IO, l::LinearCombination) 
@@ -513,8 +521,96 @@ function coeff(w::Word, c::SimpleCommutator)
      coeff(w[1:ly], c.y)*coeff(w[ly+1:end], c.x))
 end
 
-function coeff(w::Word, l::LinearCombination)
-    sum(t.c*coeff(w,t.e) for t in terms(l))
+coeff(w::Word, t::Term) = t.c*coeff(w, t.e)
+coeff(w::Word, l::LinearCombination) = sum(coeff(w,t) for t in terms(l))
+
+
+immutable MultiFor
+    k::Array{Int,1}
 end
+
+Base.start(MF::MultiFor) = Int[]
+
+Base.done(MF::MultiFor, k::Array{Int,1}) = MF.k==k
+
+function Base.next(MF::MultiFor, k::Array{Int,1}) 
+    if k==Int[]
+        k = zeros(Int, length(MF.k))
+        return(copy(k), k)
+    end
+    for i=1:length(k)
+        if k[i]<MF.k[i]
+            k[i] += 1
+            for j = 1:i-1                 
+                k[j] = 0       
+            end
+            return (copy(k), k)
+        end
+    end            
+end
+
+
+is_pure_commutator(e::Element)=false
+is_pure_commutator(g::Generator)=true
+is_pure_commutator(c::SimpleCommutator) = is_pure_commutator(c.x) && is_pure_commutator(c.y)
+
+
+function coeff(w::Word, e::Exponential)
+    r = length(w)
+    if r==0
+        return 1
+    end
+    tt = terms(e.e)
+    K = length(tt)
+    C = [t.e for t in tt]
+    @assert all(is_pure_commutator.(C)) "pure commutators expected"
+    x = [t.c for t in tt]
+    l = length.(C)
+    Q = div(r, minimum(l))
+    c = 0
+    for q = 1:Q
+        for k = MultiFor((K-1)*ones(Int,q))
+            cc = 0
+            s = sum([l[k1+1] for k1 in k])
+            if s==r
+                cc = 1
+                ll=1
+                for k1 in k                
+                    cc *= x[k1+1]*coeff(w[ll:ll+l[k1+1]-1], C[k1+1]) 
+                    ll += l[k1+1]
+                end        
+            end     
+            c += cc*(1//factorial(q))
+        end
+    end
+    c
+end
+
+function coeff(W::Array{Word}, p::Product)
+    W1 = extend_by_rightmost_subwords(W)
+    m = length(W1)
+    J = length(p.p)
+    M = Any[0 for i=1:m, j=1:m]
+    c = Any[0 for i=1:m]
+    c[1] = 1
+    for j=1:J
+        for k=1:m
+            for l=1:m
+                r = length(W1[k])-length(W1[l])
+                if r>=0 && W1[k][r+1:end]==W1[l]
+                    w = W1[k][1:r]
+                    M[k,l]  = coeff(w, p.p[j])
+                end
+            end
+        end 
+        c = M*c
+    end   
+    c = [c[findfirst(W1, w)] for w in W]
+end    
+
+coeff(w::Word, p::Product) = coeff([w], p)
+
+
+
 
 end # Expocon
