@@ -1,29 +1,302 @@
-__precompile__()
-module Expocon 
+module Expocon
 
-export MultiFor
-export Lyndon, lyndon_words, graded_lyndon_words
-export bracketing, lyndon_basis, graded_lyndon_basis
-export rightnormed_bracketing, lyndon2rightnormed
-export rightnormed_words, rightnormed_basis
-export extend_by_rightmost_subwords
-export commutator_length, commutator_contains
-export coeff, coeff_exp, coeffs_prod_exps
-export leading_word
-export rhs_exponential_splitting
-export rhs_exponential_taylor
-export rhs_exponential_taylor_symmetric
-export rhs_exponential_legendre
-export order_conditions_splitting
-export order_conditions_exponential_taylor
-export order_conditions_exponential_taylor_symmetric
-export order_conditions_exponential_legendre
-export legendre, dlegendre
-export gauss_nodes, gauss_nodes_and_weights
-export order_conditions_exponential_gauss
-export order_conditions_exponential_nodes
-export coeff_trans
+import 
+Base: (*), /, +, -, show, convert, zero, one
 
+export Element, Generator, SimpleCommutator, Commutator
+export Exponential, Product, Id, Term, LinearCombination
+export ZeroElement
+export terms
+export Word
+export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
+export rightnormed_words, rightnormed_basis, rightnormed_bracketing
+export extend_by_rightmost_subwords, leading_word
+export coeff
+
+abstract type Element end
+
+struct Generator <: Element
+    name   ::String
+    degree ::Int
+end
+
+Generator(name::String) = Generator(name, 1)
+
+Base.show(io::IO, g::Generator) = print(io, g.name)
+
+struct SimpleCommutator <: Element 
+    x::Element
+    y::Element
+end
+
+Base.show(io::IO, sc::SimpleCommutator) = print(io, "[", sc.x, ",", sc.y, "]")
+
+Commutator(g::Element) = g
+Commutator(x, y) = SimpleCommutator(Commutator(x), Commutator(y))
+Commutator(x::Tuple) = SimpleCommutator(Commutator(x[1]),Commutator(x[2]))
+
+function Commutator(x::Vector)
+    @assert length(x)==2 "wrong commutator length"
+    SimpleCommutator(Commutator(x[1]),Commutator(x[2]))
+end
+
+
+struct Exponential <: Element
+    e::Element
+end
+
+Base.exp(e::Element) = Exponential(e)
+Base.show(io::IO, e::Exponential) = print(io, "exp(", e.e, ")")
+
+struct Product <: Element
+    p::Array{Element,1}    
+end
+
+const Id = Product([])
+one(::Type{T}) where {T<:Element} = Id
+one(x::T) where {T<:Element} = one(T)
+
+
+*(p::Product, x::Element) = Product(vcat(p.p, x))
+*(x::Element, p::Product) = Product(vcat(x, p.p))
+*(x::Vararg{Element}) = Product([x...])
+
+function Base.show(io::IO, p::Product) 
+    if length(p.p)==0
+        print(io, "Id")
+    else
+        i = start(p.p)
+        is_done = done(p.p,i)
+        while !is_done
+            e, i = next(p.p,i)
+            is_done = done(p.p,i)
+            if isa(e, LinearCombination) && length(p.p)>1
+                print(io, "(", e, ")")
+            else
+                print(io, e)
+            end
+            if !is_done
+                print(io, "*")
+            end
+        end
+    end
+end
+
+struct Term <: Element
+    c::Any
+    e::Element
+end
+
+Base.convert(::Type{Term}, t::Term) = t
+Base.convert(::Type{Term}, e::Element) = Term(1, e)
+
+*(c, e::Element) = Term(c,e)
+#*(e::Element, c) = Term(c,e)
+*(c, t::Term) = Term(c*t.c,t.e)
+#*(t::Term, c) = Term(c*t.c,t.e)
+
+-(t::Term) = Term(-t.c, t.e)
+-(e::Element) = Term(-1, e)
+
+function Base.show(io::IO, t::Term)
+    if t.c!=1 
+        if !(isa(t.c, Real) && t.c>=0)
+            print(io, "(")
+        end        
+        print(io, t.c)
+        if !(isa(t.c, Real) && t.c>=0)
+            print(io, ")")
+        end        
+        print(io, "*")
+    end
+    if isa(t.e, LinearCombination)
+        print(io, "(")
+    end
+    print(io, t.e)
+    if isa(t.e, LinearCombination)
+        print(io, ")")
+    end
+end
+
+
+struct LinearCombination <: Element
+    l::Dict{Element, Any}
+end
+
+# to be removed, not the intended action which should be like +...
+LinearCombination(ee::Vararg{Element}) = LinearCombination(
+     Dict{Element,Any}([isa(e, Term)?e.e=>e.c:e=>1 for e in ee]))
+
+
+const ZeroElement = LinearCombination(Dict{Element,Any}())
+zero(::Type{T}) where {T<:Element} = ZeroElement 
+zero(x::T) where {T<:Element} = zero(T)
+
+-(x::LinearCombination)= LinearCombination(Dict{Element,Any}([e=>-c for (e,c) in x.l]))
+
+function *(c, x::LinearCombination)
+    if c==0
+        return ZeroElement
+    else
+        return LinearCombination(Dict{Element,Any}([e=>c*f for (e,f) in x.l]))
+    end
+end
+
+#*(x::LinearCombination, c) = *(c,x)
+
+function +(x::LinearCombination, y::LinearCombination)
+    r = copy(x.l)
+    for (e, c) in y.l
+        if haskey(r, e)
+            r[e] += c
+        else
+            r[e] = c
+        end    
+        if r[e]==0
+            delete!(r, e) 
+        end     
+    end
+    LinearCombination(r) 
+end
+
+function -(x::LinearCombination, y::LinearCombination)
+    r = copy(x.l)
+    for (e, c) in y.l
+        if haskey(r, e)
+            r[e] -= c
+        else
+            r[e] = -c
+        end    
+        if r[e]==0
+            delete!(r, e) 
+        end     
+    end
+    LinearCombination(r) 
+end
+
+function +(x::LinearCombination, t::Term)
+    r = copy(x.l)
+    if haskey(r, t.e)
+        r[t.e] += t.c
+    else
+        r[t.e] = t.c
+    end    
+    if r[t.e]==0
+        delete!(r, t.e) 
+    end     
+    LinearCombination(r) 
+end
+
++(x::LinearCombination, e::Element) = +(x, convert(Term, e))
++(e::Element, x::LinearCombination) = +(e, x)
+
+function +(t1::Term, t2::Term)
+    if t1.e == t2.e
+        if t1.c==-t2.c
+            return ZeroElement
+        else
+            return LinearCombination(Dict{Element,Any}(t1.e=>t1.c+t2.c))
+        end
+    else
+        return LinearCombination(Dict{Element,Any}([t1.e=>t1.c, t2.e=>t2.c]))
+    end
+end
++(e1::Element, e2::Element) = +(convert(Term, e1), convert(Term, e2))
+
+function -(t1::Term, t2::Term)
+    if t1.e == t2.e
+        if t1.c==t2.c
+            return ZeroElement
+        else
+            return LinearCombination(Dict{Element,Any}(t1.e=>t1.c-t2.c))
+        end
+    else
+        return LinearCombination(Dict{Element,Any}([t1.e=>t1.c, t2.e=>-t2.c]))
+    end
+end
+-(e1::Element, e2::Element) = -(convert(Term, e1), convert(Term, e2))
+
+
+function -(x::LinearCombination, t::Term)
+    r = copy(x.l)
+    if haskey(r, t.e)
+        r[t.e] -= t.c
+    else
+        r[t.e] = -t.c
+    end    
+
+    if r[t.e]==0
+        delete!(r, t.e) 
+    end     
+    LinearCombination(r) 
+end
+
+-(x::LinearCombination, e::Element) = -(x, convert(Term, e))
+
+function -(t::Term, x::LinearCombination)
+    r = (-x).l
+    if haskey(r, t.e)
+        r[t.e] += t.c
+    else
+        r[t.e] = t.c
+    end    
+    if r[t.e]==0
+        delete!(r, t.e) 
+    end     
+    r
+end
+
+
+-(e::Element, x::LinearCombination) = -(convert(Term, e), x)
+
+terms(x::LinearCombination) = [Term(c, e) for (e,c) in x.l]
+
+function Base.show(io::IO, l::LinearCombination) 
+    tt=terms(l)
+    if length(tt)==0
+        print(io, "0")
+    else
+        i = start(tt)
+        is_done = done(tt,i)
+        while !is_done
+            t, i = next(tt,i)
+            is_done = done(tt,i)
+            print(io, t)
+            if !is_done
+                print(io, "+")
+            end
+        end
+    end
+end
+
+
+struct Word <: AbstractArray{Generator,1}
+    w::Array{Generator,1}
+end
+
+Word(x::Vararg{Generator}) = Word([x...])
+
+Base.size(w::Word) = size(w.w)
+Base.IndexStyle(::Type{<:Word}) = IndexLinear()
+Base.getindex(w::Word, i::Int) = w.w[i]
+Base.getindex(w::Word, i) = Word(w.w[i])
+
+function Base.show(io::IO, w::Word) 
+    if length(w)==0
+        print(io, "∅")
+    else
+        i = start(w)
+        is_done = done(w,i)
+        while !is_done
+            g, i = next(w,i)
+            is_done = done(w,i)
+            print(io, g)
+            if !is_done
+                print(io, ".")
+            end
+        end
+    end
+end
 
 immutable Lyndon
     s::Int
@@ -61,32 +334,32 @@ function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false,
     sort(r, lt=(x,y)->length(x)<length(y))
 end
 
-function graded_lyndon_words(n::Integer; odd_terms_only::Bool=false, 
-                             all_lower_terms::Bool=true, max_generator_order::Integer=n)
-    W = lyndon_words(2, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
-    W1 = Array{Int,1}[]
-    for w in W
-        if w!=[1] 
-            w1 = Int[]
-            c=1
-            for i in reverse(w)
-                if i==0
-                    push!(w1, c)
-                    c = 1
-                else
-                    c+=1
-                end
-            end
-            if maximum(w1) <= max_generator_order
-                push!(W1, reverse(w1))
-            end
-        end
-    end    
-    W1
+function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, 
+                      all_lower_terms::Bool=true)
+    @assert length(G)==length(unique(G)) "Generators must be distinct"
+    W = lyndon_words(length(G), n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
+    [Word([G[g+1] for g in w]) for w in W]
 end
 
 
-function bracketing(w, W; square_brackets::Bool=true)
+Base.length(::Generator) = 1
+Base.length(C::SimpleCommutator) = 
+    (isa(C.x, SimpleCommutator)?length(C.x):1)+(isa(C.y, SimpleCommutator)?length(C.y):1)
+
+leading_word(C::Generator) = Word([C])
+leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
+
+function extend_by_rightmost_subwords(W::Array{Word})
+    WW=Dict{Word,Int}(Word([])=>1)
+    for w in W 
+        for l=1:length(w)
+            WW[w[l:end]] = 1
+        end
+    end
+    return sort(collect(keys(WW)), lt=(x,y)->length(x)<length(y))
+end
+
+function lyndon_bracketing(w::Word, W::Array{Word})
     if length(w) == 1
         return w[1]
     end
@@ -97,45 +370,17 @@ function bracketing(w, W; square_brackets::Bool=true)
             break
         end
     end    
-    if square_brackets
-	return Any[bracketing(w[1:k0-1], W, square_brackets=square_brackets), 
-	           bracketing(w[k0:end], W, square_brackets=square_brackets)]
-    else
-        return (bracketing(w[1:k0-1], W, square_brackets=square_brackets), 
-	        bracketing(w[k0:end], W, square_brackets=square_brackets))
-    end
+    SimpleCommutator(lyndon_bracketing(w[1:k0-1], W), lyndon_bracketing(w[k0:end], W) )
 end
 
-function lyndon_basis(s::Integer, n::Integer; square_brackets::Bool=true, 
+function lyndon_basis(G::Array{Generator,1}, n::Integer; 
                       odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
-    W = lyndon_words(s, n)
-    [bracketing(w, W, square_brackets=square_brackets) for w in W if
+    W = lyndon_words(G, n)
+    [lyndon_bracketing(w, W) for w in W if
         (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))]
 end
 
-function graded_lyndon_basis(n::Integer; square_brackets::Bool=true, 
-                             odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
-                             max_generator_order::Integer=n)
-    W = graded_lyndon_words(n)
-    [bracketing(w, W, square_brackets=square_brackets) for w in W if
-        (all_lower_terms || sum(w)==n) && (!odd_terms_only || isodd(sum(w)))
-       &&  maximum(w)<=max_generator_order ]
-end
-
-
-function rightnormed_bracketing(w; square_brackets::Bool=true)
-    if length(w) == 1
-        return w[1]
-    end
-    if square_brackets
-        return Any[w[1], rightnormed_bracketing(w[2:end], square_brackets=square_brackets)]
-    else
-        return (w[1], rightnormed_bracketing(w[2:end], square_brackets=square_brackets))
-    end
-end
-
-
-function analyze_lyndon_word(w)
+function analyze_lyndon_word(w::Array{Int,1})
     #println(w)
     q = maximum(w)
     A = Dict{Array{Int64,1}, Int}([[x]=>x for x in 1:q])
@@ -210,7 +455,7 @@ function analyze_lyndon_word(w)
 end
 
 
-function lyndon2rightnormed(w)
+function lyndon2rightnormed(w::Array{Int, 1})
     aa = minimum(w)
     k=0 # number of occurences of a in w
     for x in w
@@ -235,344 +480,41 @@ function lyndon2rightnormed(w)
 end
 
 
-function rightnormed_words(s::Integer, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
-    W = lyndon_words(s, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
-    lyndon2rightnormed.(W) 
-end
-
-function rightnormed_basis(s::Integer, n::Integer;  square_brackets::Bool=true, odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
-    W = rightnormed_words(s, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
-    [rightnormed_bracketing(w, square_brackets=square_brackets) for w in W]
+function rightnormed_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
+    @assert length(G)==length(unique(G)) "Generators must be distinct"
+    W = lyndon_words(length(G), n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
+    [Word([G[g+1] for g in lyndon2rightnormed(w)]) for w in W]
 end
 
 
-
-function extend_by_rightmost_subwords(W::Array{Array{Int64,1},1})
-    WW=Dict{Array{Int64,1},Int}(Int64[]=>1)
-    for w in W 
-        for l=1:length(w)
-            WW[w[l:end]] = 1
-        end
+function rightnormed_bracketing(w::Word)
+    if length(w) == 1
+        return w[1]
     end
-    return sort(collect(keys(WW)), lt=(x,y)->length(x)<length(y))
+    SimpleCommutator(w[1], rightnormed_bracketing(w[2:end]))
 end
 
 
-commutator_length(C::Int) = 1
-
-function commutator_length(C::Vector)
-    if length(C)!=2
-         error("not well-formed commutator")
-    end
-    commutator_length(C[1])+commutator_length(C[2])
+function rightnormed_basis(G::Array{Generator,1}, n::Integer; 
+                      odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
+    W = rightnormed_words(G, n, odd_terms_only= odd_terms_only, all_lower_terms=all_lower_terms)
+    [rightnormed_bracketing(w) for w in W]
 end
 
+coeff(w::Word, g::Generator) = length(w)==1&&w[1]==g?1:0
 
-commutator_contains(C1, C2::Int) = C1==C2
-
-function commutator_contains(C1, C2::Vector)
-    if length(C2)!=2
-         error("not well-formed commutator")
-    end    
-    C1==C2||commutator_contains(C1, C2[1])||commutator_contains(C1, C2[2])
-end
-
-
-leading_word(C::Int)=[C]
-leading_word(C::Vector) = vcat(leading_word(C[1]), leading_word(C[2]))
-
-
-function coeff{R}(W::Array{Int,1}, C::Int, g::Array{R,1}=[]) 
-    if length(g)==0
-        return length(W)==1&&W[1]==C?1:0    
-    else
-        return length(W)==1?1g[C]^W[1]:0     
-    end
-end
-
-function coeff{R}(W::Array{Int,1}, C::Vector, g::Array{R,1}=[])
-    if length(C)!=2
-         error("not well-formed commutator")
-    end
-    l1 = commutator_length(C[1])
-    l2 = commutator_length(C[2])
-    if l1+l2 != length(W)
+function coeff(w::Word, c::SimpleCommutator)
+    lx = length(c.x)
+    ly = length(c.y)
+    if lx+ly != length(w)
         return 0
     end
-    (coeff(W[1:l1], C[1], g)*coeff(W[l1+1:end], C[2], g) -
-     coeff(W[1:l2], C[2], g)*coeff(W[l2+1:end], C[1], g) )      
+    (coeff(w[1:lx], c.x)*coeff(w[lx+1:end], c.y) -
+     coeff(w[1:ly], c.y)*coeff(w[ly+1:end], c.x))
 end
 
-
-immutable MultiFor
-    k::Array{Int,1}
+function coeff(w::Word, l::LinearCombination)
+    sum(t.c*coeff(w,t.e) for t in terms(l))
 end
 
-Base.start(MF::MultiFor) = Int[]
-
-Base.done(MF::MultiFor, k::Array{Int,1}) = MF.k==k
-
-function Base.next(MF::MultiFor, k::Array{Int,1}) 
-    if k==Int[]
-        k = zeros(Int, length(MF.k))
-        return(copy(k), k)
-    end
-    for i=1:length(k)
-        if k[i]<MF.k[i]
-            k[i] += 1
-            for j = 1:i-1                 
-                k[j] = 0       
-            end
-            return (copy(k), k)
-        end
-    end            
-end
-
-
-function coeff_exp{T,S,R}(W::Array{Int,1}, G::Array{Tuple{T,S},1}, g::Array{R,1}=[])
-    r = length(W)
-    if r==0
-        return one(T)
-    end
-    K = length(G)
-    C = [g[2] for g in G]
-    x = [g[1] for g in G]
-    l = commutator_length.(C)
-    Q = div(r, minimum(l))
-    c = zero(T)
-    for q = 1:Q
-        #println("q=",q," -----------------")
-        for k = MultiFor((K-1)*ones(Int,q))
-            cc = zero(T)
-            s = sum([l[k1+1] for k1 in k])
-            #println(k, " ", s)
-            if s==r
-                cc = one(T)
-                ll=1
-                for k1 in k                
-                    cc *= x[k1+1]*coeff(W[ll:ll+l[k1+1]-1], C[k1+1], g) 
-                    ll += l[k1+1]
-                end        
-                #println("coeff = ", cc)
-            end     
-            c += cc/factorial(q)
-        end
-    end
-    c
-end
-
-
-function coeffs_prod_exps{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
-    W1 = extend_by_rightmost_subwords(W)
-    m = length(W1)
-    J = length(G)
-    M = zeros(T, m, m)
-    c = zeros(T, m)
-    c[1] = one(T)
-    for j=1:J
-        for k=1:m
-            for l=1:m
-                r = length(W1[k])-length(W1[l])
-                if r>=0 && W1[k][r+1:end]==W1[l]
-                    w = W1[k][1:r]
-                    M[k,l]  = coeff_exp(w, G[j], g)
-                end
-            end
-        end 
-        c = M*c
-    end   
-    c = [c[findfirst(W1, w)] for w in W]
-end    
-
-
-rhs_exponential_splitting(W::Array{Array{Int64,1},1}) = [1//factorial(length(w)) for w in W]
-
-function order_conditions_splitting{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
-    coeffs_prod_exps(W, G) - rhs_exponential_splitting(W)
-end
-
-
-function order_conditions_splitting{T}(W::Array{Array{Int64,1},1}, a::Array{T, 1}, b::Array{T, 1})
-    sa = length(a)
-    sb = length(b)
-    G = Array{Tuple{T,Int},1}[]
-    for j=1:max(sa, sb)
-        if j<=sa && a[j]!=0
-            push!(G, [(a[j], 0)])
-        end
-        if j<=sb && b[j]!=0
-            push!(G, [(b[j], 1)])
-        end
-    end
-    order_conditions_splitting(W, G)
-end
-
-function rhs_exponential_taylor(W::Array{Array{Int64,1},1})
-    T = Rational{Int}    
-    c = zeros(T, length(W))
-    p = maximum([sum(w) for w in W])  
-    for i=1:length(W)
-        w = W[i]
-        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
-    end
-    c
-end    
-
-function order_conditions_exponential_taylor{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
-    coeffs_prod_exps(W, G, g) - rhs_exponential_taylor(W)
-end
-
-
-function rhs_exponential_taylor_symmetric(W::Array{Array{Int64,1},1})
-    T = Rational{Int}    
-    c = zeros(T, length(W))
-    p = maximum([sum(w) for w in W])
-    Cinv = T[(-1)^(m+n)*(n>=m?binomial(n,m)//2^(n-m):0) for m=0:p-1, n=0:p-1]
-    for i=1:length(W)
-        w = W[i]
-        l = length(w)
-        s = zero(T)
-        for v in MultiFor(w-1)
-            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
-        end
-        c[i] = s
-    end
-    c
-end
-
-function order_conditions_exponential_taylor_symmetric{T,S,R}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Array{R,1}=[])
-    coeffs_prod_exps(W, G, g) - rhs_exponential_taylor_symmetric(W)
-end
-
-
-function rhs_exponential_legendre(W::Array{Array{Int64,1},1})
-    T = Rational{Int}    
-    c = zeros(T, length(W))
-    p = maximum([sum(w) for w in W])
-    Cinv = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
-    for i=1:length(W)
-        w = W[i]
-        l = length(w)
-        s = zero(T)
-        for v in MultiFor(w-1)
-            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
-        end
-        c[i] = s
-    end
-    c
-end
-
-function order_conditions_exponential_legendre{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1})
-    coeffs_prod_exps(W, G) - rhs_exponential_legendre(W)
-end
-
-
-using Giac
-
-legendre{T}(n::Integer, x::T) = (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*(-1)^k*(k==0?1:x^k) for k=0:n])
-
-function dlegendre{T}(n::Integer, x::T, q::Integer=1) 
-    if q>n
-        return zero(T)
-    end    
-    (-1)^n*sum([binomial(n,k)*binomial(n+k,k)*prod((k-q+1):k)*(-1)^k*(k==q?1:x^(k-q)) for k=q:n])
-end
-
-function gauss_nodes(n::Integer) 
-    x = giac_identifier("__x__")
-    to_julia(solve(equal(legendre(n, x), 0), x))
-end
-
-function gauss_nodes_and_weights(n)
-    x = gauss_nodes(n)
-    w = [simplify(1/(t*(1-t)*dlegendre(n, t)^2)) for t in x]
-    x,w
-end
-
-
-function order_conditions_exponential_gauss{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, q::Integer)
-    c = coeffs_prod_exps(W, G)
-    c1 = zeros(T, length(W))
-    p = maximum([length(w) for w in W])
-    C = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
-    x,g = gauss_nodes_and_weights(q)
-    C1 = [one(giac)*(2*n-1)*g[m]*legendre(n-1,x[m]) for m=1:q, n=1:p]
-    for i=1:length(W)
-        y = W[i]
-        l = length(y)
-        s = zero(T)
-        for w in MultiFor(fill(l-1,l))
-            s1 = zero(T)
-            for v in MultiFor(fill(l-1,l))
-                s1 += prod([C[v[j]+1,w[j]+1]/sum([v[i]+1 for i=j:l]) for j=1:l])
-            end
-            s += s1*prod([C1[y[j],w[j]+1] for j=1:l])
-        end
-        c1[i] = c[i] - s
-    end
-    c1
-end                
-
-function order_conditions_exponential_nodes{T,S}(W::Array{Array{Int64,1},1}, G::Array{Array{Tuple{T,S},1},1}, g::Vector)
-    c = coeffs_prod_exps(W, G)    
-    c1 = zeros(T, length(W))
-    p = maximum([length(w) for w in W])
-    q = length(g)
-    Cinv = to_julia(giac(:inverse, [g[m]^n for m=1:q, n=0:q])) 
-    Cinv = [Cinv[i][j] for i=1:q, j=1:q]
-    for i=1:length(W)
-        w = W[i]
-        l = length(w)
-        s = zero(giac)
-        for v in MultiFor(fill(q-1,l))
-            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
-        end
-        c1[i] = c[i]-s
-    end
-    c1
-end        
-
-
-
-coeff_trans(W::Array{Int,1}, C::Int, T::Matrix) = length(W)==1?T[W[1], C]:0
-
-function coeff_trans(W::Array{Int,1}, C::Vector, T::Matrix)
-    if length(C)!=2
-         error("not well-formed commutator")
-    end
-    l1 = commutator_length(C[1])
-    l2 = commutator_length(C[2])
-    if l1+l2 != length(W)
-        return 0
-    end
-    (coeff_trans(W[1:l1], C[1], T)*coeff_trans(W[l1+1:end], C[2], T) -
-     coeff_trans(W[1:l2], C[2], T)*coeff_trans(W[l2+1:end], C[1], T) )
-end
-
-function coeff_trans{T,S}(W::Array{Int,1}, G::Array{Tuple{T,S},1}, TM::Matrix)
-    c = zero(T)
-    for (c1, C) in G
-        c += c1*coeff_trans(W, C, TM)
-    end
-    c
-end
-
-
-function transform{T,S}(B::Vector, G::Array{Tuple{T,S},1}, TM::Matrix)
-    G1 = Tuple{T,Any}[]
-    for b in B
-        W = leading_word(b)
-        h = coeff_trans(W, G, TM)
-        if !iszero(h)
-            push!(G1, (simplify(h), b))
-        end
-    end
-    G1
-end
-
-function transform{T,S}(B::Vector, G::Array{Array{Tuple{T,S},1}}, TM::Matrix)
-    Array{Tuple{T,S},1}[transform(B, g, TM) for g in G]
-end
-
-
-end #Expocon
+end # Expocon
