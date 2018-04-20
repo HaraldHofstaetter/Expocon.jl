@@ -13,7 +13,7 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export is_pure_commutator, coeff
+export is_pure_commutator, coeff, coeffs, degree
 
 abstract type Element end
 
@@ -150,6 +150,7 @@ end
 *(x::LinearCombination, e::Element) = Product([x, e])
 *(t::Term, x::LinearCombination) = Product([t, x])
 *(x::LinearCombination, t::Term) = Product([x, t])
+*(t1::Term, t2::Term) = Product([t1, t2])
 
 function +(x::LinearCombination, y::LinearCombination)
     r = copy(x.l)
@@ -354,10 +355,13 @@ Base.length(::Generator) = 1
 Base.length(C::SimpleCommutator) = 
     (isa(C.x, SimpleCommutator)?length(C.x):1)+(isa(C.y, SimpleCommutator)?length(C.y):1)
 
+degree(g::Generator) = g.degree
+degree(C::SimpleCommutator) = degree(C.x)+degree(C.y) 
+
 leading_word(C::Generator) = Word([C])
 leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
 
-function extend_by_rightmost_subwords(W::Array{Word})
+function extend_by_rightmost_subwords(W::Array{Word, 1})
     WW=Dict{Word,Int}(Word([])=>1)
     for w in W 
         for l=1:length(w)
@@ -367,7 +371,7 @@ function extend_by_rightmost_subwords(W::Array{Word})
     return sort(collect(keys(WW)), lt=(x,y)->length(x)<length(y))
 end
 
-function lyndon_bracketing(w::Word, W::Array{Word})
+function lyndon_bracketing(w::Word, W::Array{Word, 1})
     if length(w) == 1
         return w[1]
     end
@@ -552,6 +556,7 @@ end
 
 is_pure_commutator(e::Element)=false
 is_pure_commutator(g::Generator)=true
+is_pure_commutator(t::Term)=true
 is_pure_commutator(c::SimpleCommutator) = is_pure_commutator(c.x) && is_pure_commutator(c.y)
 
 
@@ -586,7 +591,7 @@ function coeff(w::Word, e::Exponential)
     c
 end
 
-function coeff(W::Array{Word}, p::Product)
+function coeffs(W::Array{Word, 1}, p::Product)
     W1 = extend_by_rightmost_subwords(W)
     m = length(W1)
     J = length(p.p)
@@ -608,8 +613,9 @@ function coeff(W::Array{Word}, p::Product)
     c = [c[findfirst(W1, w)] for w in W]
 end    
 
-coeff(w::Word, p::Product) = coeff([w], p)
+coeff(w::Word, p::Product) = coeffs([w], p)[1]
 
+coeffs(W::Array{Word,1}, e::Element) = [coeff(w, e) for w in W]
 
 
 
