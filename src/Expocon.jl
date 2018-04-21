@@ -13,7 +13,7 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export is_lie_element
+export is_lie_element, is_homogenous_lie_element
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify
 
@@ -549,6 +549,15 @@ is_lie_element(g::Generator)=true
 is_lie_element(t::Term)=is_lie_element(t.e)
 is_lie_element(c::SimpleCommutator) = is_lie_element(c.x) && is_lie_element(c.y)
 is_lie_element(l::LinearCombination) = all(is_lie_element.(terms(l))) 
+
+degree(t::Term) = degree(t.e)
+is_homogenous_lie_element(e::Element) = is_lie_element(e)
+is_homogenous_lie_element(l::LinearCombination) = is_lie_element(l) && (length(l.l)<=1 ||all(degree(l.l[1]).==degree.(l.l[2:end]))) 
+
+function degree(l::LinearCombination)
+    @assert is_homogenous_lie_element(l) "homogenous lie element expected"
+    length(l.l)==0?-1:degree(l.l[1])
+end
 
 
 function coeff(w::Word, e::Exponential)
