@@ -13,7 +13,8 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export is_pure_commutator, coeff, coeffs, degree
+export is_pure_commutator
+export coeff, coeffs, degree
 export distribute, expand_commutators, simplify
 
 abstract type Element end
@@ -125,6 +126,8 @@ zero(x::T) where {T<:Element} = zero(T)
 *(e::Element, c) = Term(c,e)
 *(c, t::Term) = Term(c*t.c,t.e)
 *(t::Term, c) = Term(c*t.c,t.e)
+*(c, l::LinearCombination) = LinearCombination([c*t for t in terms(l)])
+*(l::LinearCombination, c) = LinearCombination([c*t for t in terms(l)])
 
 *(p::Product, x::Element) = Product(vcat(p.p, x))
 *(x::Element, p::Product) = Product(vcat(x, p.p))
@@ -142,6 +145,7 @@ zero(x::T) where {T<:Element} = zero(T)
 +(e::Element) = e
 -(t::Term) = Term(-t.c, t.e)
 -(e::Element) = Term(-1, e)
+-(l::LinearCombination) = LinearCombination([-t for t in terms(l)])
 -(e1::Element, e2::Element) = e1+(-e2)
 
 
@@ -535,7 +539,7 @@ end
 
 is_pure_commutator(e::Element)=false
 is_pure_commutator(g::Generator)=true
-is_pure_commutator(t::Term)=true
+is_pure_commutator(t::Term)=is_pure_commutator(t.e)
 is_pure_commutator(c::SimpleCommutator) = is_pure_commutator(c.x) && is_pure_commutator(c.y)
 
 
@@ -547,7 +551,7 @@ function coeff(w::Word, e::Exponential)
     tt = terms(e.e)
     K = length(tt)
     C = [t.e for t in tt]
-    @assert all(is_pure_commutator.(C)) "pure commutators expected"
+ #   @assert all(is_pure_commutator.(C)) "pure commutators expected"
     x = [t.c for t in tt]
     l = length.(C)
     Q = div(r, minimum(l))
