@@ -136,6 +136,10 @@ zero(x::T) where {T<:Element} = zero(T)
 *(t1::Term, t2::Term) = Term(t1.c*t2.c, t1.e*t2.e)
 *(t::Term, e::Element) = Term(t.c, t.e*e)
 *(e::Element, t::Term) = Term(t.c, e*t.e)
+*(l::LinearCombination, e::Element) = Product([l, e]) 
+*(e::Element, l::LinearCombination) = Product([e, l])
+*(l::LinearCombination, p::Product) = Product([l, p]) 
+*(p::Product, l::LinearCombination) = Product([p, l])
 
 +(l1::LinearCombination, l2::LinearCombination) = LinearCombination(vcat(l1.l, l2.l))
 +(l::LinearCombination, t::Term) = LinearCombination(vcat(l.l, t))
@@ -181,7 +185,7 @@ end
 
 expand_commutators(t::Term) = t.c*expand_commutators(t.e)
 
-expand_commutators(l::LinearCombination) = sum([expand_commutator(t) for t in terms(l)])
+expand_commutators(l::LinearCombination) = sum([expand_commutators(t) for t in terms(l)])
 
 function expand_commutators(p::Product) 
     if length(p.p)==0
