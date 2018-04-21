@@ -327,9 +327,17 @@ end
 
 function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, 
                       all_lower_terms::Bool=true)
-    @assert length(G)==length(unique(G)) "Generators must be distinct"
-    W = lyndon_words(length(G), n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
-    [Word([G[g+1] for g in w]) for w in W]
+    s = length(G)
+    @assert s==length(unique(G)) "Generators must be distinct"
+    r = Word[]
+    for w0 in Lyndon(s,n)
+        w = Word(G[w0+1])
+        d = degree(w)
+        if  ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d))
+            push!(r, w)
+        end
+    end
+    sort(r, lt=(x,y)->degree(x)<degree(y))
 end
 
 
@@ -476,9 +484,8 @@ end
 
 
 function rightnormed_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
-    @assert length(G)==length(unique(G)) "Generators must be distinct"
-    W = lyndon_words(length(G), n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
-    [Word([G[g+1] for g in lyndon2rightnormed(w)]) for w in W]
+    W = lyndon_words(G, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
+    [Word([G[g+1] for g in lyndon2rightnormed([findfirst(G,g)-1 for g in w])]) for w in W]
 end
 
 
