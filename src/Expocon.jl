@@ -2,7 +2,7 @@ __precompile__()
 module Expocon
 
 import 
-Base: (*), /, +, -, show, convert, zero, one
+Base: (*), /, +, -, show, convert, zero, one, expand
 
 export MultiFor
 export Element, Generator, SimpleCommutator, Commutator
@@ -14,6 +14,7 @@ export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
 export is_pure_commutator, coeff, coeffs, degree
+export distribute, expand_commutators, simplify
 
 abstract type Element end
 
@@ -58,11 +59,6 @@ const Id = Product([])
 one(::Type{T}) where {T<:Element} = Id
 one(x::T) where {T<:Element} = one(T)
 
-*(p::Product, x::Element) = Product(vcat(p.p, x))
-*(x::Element, p::Product) = Product(vcat(x, p.p))
-*(p1::Product, p2::Product) = Product(vcat(p1.p, p2.p))
-*(e1::Element, e2::Element) = Product([e1, e2])
-#*(x::Vararg{Element}) = Product([x...])
 
 function Base.show(io::IO, p::Product) 
     if length(p.p)==0
@@ -93,13 +89,6 @@ end
 Base.convert(::Type{Term}, t::Term) = t
 Base.convert(::Type{Term}, e::Element) = Term(1, e)
 
-*(c, e::Element) = Term(c,e)
-*(e::Element, c) = Term(c,e)
-*(c, t::Term) = Term(c*t.c,t.e)
-*(t::Term, c) = Term(c*t.c,t.e)
-
--(t::Term) = Term(-t.c, t.e)
--(e::Element) = Term(-1, e)
 
 function Base.show(io::IO, t::Term)
     if t.c!=1 
@@ -126,31 +115,29 @@ struct LinearCombination <: Element
     l::Dict{Element, Any}
 end
 
-# to be removed, not the intended action which should be like +...
-LinearCombination(ee::Vararg{Element}) = LinearCombination(
-     Dict{Element,Any}([isa(e, Term)?e.e=>e.c:e=>1 for e in ee]))
+LinearCombination(tt::Vararg{Term}) = LinearCombination(
+     Dict{Element,Any}([t.e=>t.c for t in tt]))
 
 
 const ZeroElement = LinearCombination(Dict{Element,Any}())
 zero(::Type{T}) where {T<:Element} = ZeroElement 
 zero(x::T) where {T<:Element} = zero(T)
 
--(x::LinearCombination)= LinearCombination(Dict{Element,Any}([e=>-c for (e,c) in x.l]))
+*(c, e::Element) = Term(c,e)
+*(e::Element, c) = Term(c,e)
+*(c, t::Term) = Term(c*t.c,t.e)
+*(t::Term, c) = Term(c*t.c,t.e)
 
-function *(c, x::LinearCombination)
-    if c==0
-        return ZeroElement
-    else
-        return LinearCombination(Dict{Element,Any}([e=>c*f for (e,f) in x.l]))
-    end
-end
+-(t::Term) = Term(-t.c, t.e)
+-(e::Element) = Term(-1, e)
 
-*(x::LinearCombination, c) = *(c,x)
-*(e::Element, x::LinearCombination) = Product([e, x])
-*(x::LinearCombination, e::Element) = Product([x, e])
-*(t::Term, x::LinearCombination) = Product([t, x])
-*(x::LinearCombination, t::Term) = Product([x, t])
-*(t1::Term, t2::Term) = Product([t1, t2])
+*(p::Product, x::Element) = Product(vcat(p.p, x))
+*(x::Element, p::Product) = Product(vcat(x, p.p))
+*(p1::Product, p2::Product) = Product(vcat(p1.p, p2.p))
+*(e1::Element, e2::Element) = Product([e1, e2])
+*(t1::Term, t2::Term) = Term(t1.c*t2.c, t1.e*t2.e)
+*(t::Term, e::Element) = Term(t.c, t.e*e)
+*(e::Element, t::Term) = Term(t.c, e*t.e)
 
 function +(x::LinearCombination, y::LinearCombination)
     r = copy(x.l)
@@ -196,7 +183,7 @@ function +(x::LinearCombination, t::Term)
 end
 
 +(x::LinearCombination, e::Element) = +(x, convert(Term, e))
-+(e::Element, x::LinearCombination) = +(e, x)
++(e::Element, x::LinearCombination) = +(x, convert(Term, e))
 
 function +(t1::Term, t2::Term)
     if t1.e == t2.e
@@ -241,18 +228,7 @@ end
 
 -(x::LinearCombination, e::Element) = -(x, convert(Term, e))
 
-function -(t::Term, x::LinearCombination)
-    r = (-x).l
-    if haskey(r, t.e)
-        r[t.e] += t.c
-    else
-        r[t.e] = t.c
-    end    
-    if r[t.e]==0
-        delete!(r, t.e) 
-    end     
-    r
-end
+-(t::Term, x::LinearCombination)= -(x-t)
 
 
 -(e::Element, x::LinearCombination) = -(convert(Term, e), x)
@@ -277,6 +253,95 @@ function Base.show(io::IO, l::LinearCombination)
         end
     end
 end
+
+
+expand_commutators(e::Element) = e
+
+function expand_commutators(c::SimpleCommutator)
+    x = expand_commutators(c.x)
+    y = expand_commutators(c.y)
+    x*y-y*x
+end
+
+expand_commutators(t::Term) = t.c*expand_commutators(t.e)
+
+expand_commutators(l::LinearCombination) = sum([expand_commutator(t) for t in terms(l)])
+
+function expand_commutators(p::Product) 
+    if length(p.p)==0
+        return Id
+    elseif length(p.p)==1
+        return expand_commutators(p.p[1])
+    else
+        return expand_commutators(p.p[1])*expand_commutators(Product(p.p[2:end]))
+    end
+end
+
+
+distribute(e1::Element, e2::Element) = e1*e2
+distribute(t::Term, l::LinearCombination) = sum([t*t1 for t1 in terms(l)])
+distribute(l::LinearCombination, t::Term) = sum([t1*t for t1 in terms(l)])
+distribute(l1::LinearCombination, l2::LinearCombination) = sum([t1*t2 for t1 in terms(l1) for t2 in terms(l2)]) 
+distribute(e::Element, l::LinearCombination) = distribute(Term(e), l)
+distribute(l::LinearCombination, e::Element) = distribute(l, Term(e))
+
+
+Base.expand(e::Element) = e
+
+function Base.expand(t::Term) 
+    ee = expand(t.e)
+    if isa(ee, LinearCombination)
+        return sum((t.c*t1.c)*t1.e for t1 in terms(ee))
+    else
+        return t.c*expand(ee)
+    end
+end
+
+Base.expand(l::LinearCombination) = sum([expand(t) for t in terms(l)])
+
+function Base.expand(p::Product)
+    if length(p.p)==0
+        return Id
+    else
+        r = expand(p.p[1])
+        for j=2:length(p.p)
+            r = distribute(r, expand(p.p[j]))
+        end
+        return r
+    end
+end
+
+
+key(g::Generator) = ('G', g.name)
+key(e::Exponential) = ('E', key(e.e))
+key(t::Term) = ('T', t.c, key(t.e))
+key(c::SimpleCommutator) = ('C', key(c.x), key(c.y))
+key(p::Product) = (vcat('P', [key(f) for f in p.p])...)
+key(l::LinearCombination) = (vcat('L', sort([key(t) for t in terms(l)]))...)
+
+simplify(g::Generator) = g
+simplify(e::Exponential) = Exponential(simplify(e.e))
+simplify(t::Term) = Term(t.c, simplify(t.e))
+simplify(c::SimpleCommutator) = Commutator(simplify(c.x), simplify(c.y))
+simplify(p::Product) = Product([simplify(f) for f in p.p])
+
+function simplify(l::LinearCombination)
+    tab=Dict{Any, Term}()    
+    for t0 in terms(l)
+        t = simplify(t0)
+        k = key(t.e)
+        if haskey(tab, k)
+            tab[k] = Term(tab[k].c+t.c, tab[k].e)
+        else
+            tab[k] = t
+        end    
+        if tab[k].c==0
+            delete!(tab, k) 
+        end     
+    end
+    LinearCombination(Dict{Element,Any}([t.e=>t.c for t in values(tab)]))
+end
+
 
 
 struct Word <: AbstractArray{Generator,1}
