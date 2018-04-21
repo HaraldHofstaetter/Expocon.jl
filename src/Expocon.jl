@@ -13,7 +13,7 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export is_pure_commutator
+export is_lie_element
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify
 
@@ -544,13 +544,15 @@ function Base.next(MF::MultiFor, k::Array{Int,1})
 end
 
 
-is_pure_commutator(e::Element)=false
-is_pure_commutator(g::Generator)=true
-is_pure_commutator(t::Term)=is_pure_commutator(t.e)
-is_pure_commutator(c::SimpleCommutator) = is_pure_commutator(c.x) && is_pure_commutator(c.y)
+is_lie_element(e::Element)=false
+is_lie_element(g::Generator)=true
+is_lie_element(t::Term)=is_lie_element(t.e)
+is_lie_element(c::SimpleCommutator) = is_lie_element(c.x) && is_lie_element(c.y)
+is_lie_element(l::LinearCombination) = all(is_lie_element.(terms(l))) 
 
 
 function coeff(w::Word, e::Exponential)
+    @assert is_lie_element(e.e) "lie element in exponent expected"
     r = length(w)
     if r==0
         return 1
@@ -558,7 +560,6 @@ function coeff(w::Word, e::Exponential)
     tt = terms(e.e)
     K = length(tt)
     C = [t.e for t in tt]
- #   @assert all(is_pure_commutator.(C)) "pure commutators expected"
     x = [t.c for t in tt]
     l = length.(C)
     Q = div(r, minimum(l))
