@@ -112,24 +112,19 @@ end
 
 
 struct LinearCombination <: Element
-    l::Dict{Element, Any}
+    l::Array{Term,1}    
 end
 
-LinearCombination(tt::Vararg{Term}) = LinearCombination(
-     Dict{Element,Any}([t.e=>t.c for t in tt]))
+const ZeroElement = LinearCombination([])
 
-
-const ZeroElement = LinearCombination(Dict{Element,Any}())
 zero(::Type{T}) where {T<:Element} = ZeroElement 
 zero(x::T) where {T<:Element} = zero(T)
+
 
 *(c, e::Element) = Term(c,e)
 *(e::Element, c) = Term(c,e)
 *(c, t::Term) = Term(c*t.c,t.e)
 *(t::Term, c) = Term(c*t.c,t.e)
-
--(t::Term) = Term(-t.c, t.e)
--(e::Element) = Term(-1, e)
 
 *(p::Product, x::Element) = Product(vcat(p.p, x))
 *(x::Element, p::Product) = Product(vcat(x, p.p))
@@ -139,102 +134,19 @@ zero(x::T) where {T<:Element} = zero(T)
 *(t::Term, e::Element) = Term(t.c, t.e*e)
 *(e::Element, t::Term) = Term(t.c, e*t.e)
 
-function +(x::LinearCombination, y::LinearCombination)
-    r = copy(x.l)
-    for (e, c) in y.l
-        if haskey(r, e)
-            r[e] += c
-        else
-            r[e] = c
-        end    
-        if r[e]==0
-            delete!(r, e) 
-        end     
-    end
-    LinearCombination(r) 
-end
++(l1::LinearCombination, l2::LinearCombination) = LinearCombination(vcat(l1.l, l2.l))
++(l::LinearCombination, t::Term) = LinearCombination(vcat(l.l, t))
++(t::Term, l::LinearCombination) = LinearCombination(vcat(t, l.l))
++(t1::Term, t2::Term) =  LinearCombination(vcat(t1, t2))
++(e1::Element, e2::Element) = LinearCombination(vcat(convert(Term, e1), convert(Term, e2)))
++(e::Element) = e
+-(t::Term) = Term(-t.c, t.e)
+-(e::Element) = Term(-1, e)
+-(e1::Element, e2::Element) = e1+(-e2)
 
-function -(x::LinearCombination, y::LinearCombination)
-    r = copy(x.l)
-    for (e, c) in y.l
-        if haskey(r, e)
-            r[e] -= c
-        else
-            r[e] = -c
-        end    
-        if r[e]==0
-            delete!(r, e) 
-        end     
-    end
-    LinearCombination(r) 
-end
-
-function +(x::LinearCombination, t::Term)
-    r = copy(x.l)
-    if haskey(r, t.e)
-        r[t.e] += t.c
-    else
-        r[t.e] = t.c
-    end    
-    if r[t.e]==0
-        delete!(r, t.e) 
-    end     
-    LinearCombination(r) 
-end
-
-+(x::LinearCombination, e::Element) = +(x, convert(Term, e))
-+(e::Element, x::LinearCombination) = +(x, convert(Term, e))
-
-function +(t1::Term, t2::Term)
-    if t1.e == t2.e
-        if t1.c==-t2.c
-            return ZeroElement
-        else
-            return LinearCombination(Dict{Element,Any}(t1.e=>t1.c+t2.c))
-        end
-    else
-        return LinearCombination(Dict{Element,Any}([t1.e=>t1.c, t2.e=>t2.c]))
-    end
-end
-+(e1::Element, e2::Element) = +(convert(Term, e1), convert(Term, e2))
-
-function -(t1::Term, t2::Term)
-    if t1.e == t2.e
-        if t1.c==t2.c
-            return ZeroElement
-        else
-            return LinearCombination(Dict{Element,Any}(t1.e=>t1.c-t2.c))
-        end
-    else
-        return LinearCombination(Dict{Element,Any}([t1.e=>t1.c, t2.e=>-t2.c]))
-    end
-end
--(e1::Element, e2::Element) = -(convert(Term, e1), convert(Term, e2))
-
-
-function -(x::LinearCombination, t::Term)
-    r = copy(x.l)
-    if haskey(r, t.e)
-        r[t.e] -= t.c
-    else
-        r[t.e] = -t.c
-    end    
-
-    if r[t.e]==0
-        delete!(r, t.e) 
-    end     
-    LinearCombination(r) 
-end
-
--(x::LinearCombination, e::Element) = -(x, convert(Term, e))
-
--(t::Term, x::LinearCombination)= -(x-t)
-
-
--(e::Element, x::LinearCombination) = -(convert(Term, e), x)
 
 terms(e::Element) = [Term(e)]
-terms(x::LinearCombination) = [Term(c, e) for (e,c) in x.l]
+terms(x::LinearCombination) = x.l
 
 function Base.show(io::IO, l::LinearCombination) 
     tt=terms(l)
@@ -325,6 +237,7 @@ simplify(t::Term) = Term(t.c, simplify(t.e))
 simplify(c::SimpleCommutator) = Commutator(simplify(c.x), simplify(c.y))
 simplify(p::Product) = Product([simplify(f) for f in p.p])
 
+
 function simplify(l::LinearCombination)
     tab=Dict{Any, Term}()    
     for t0 in terms(l)
@@ -339,7 +252,7 @@ function simplify(l::LinearCombination)
             delete!(tab, k) 
         end     
     end
-    LinearCombination(Dict{Element,Any}([t.e=>t.c for t in values(tab)]))
+    LinearCombination(collect(values(tab)))
 end
 
 
@@ -422,6 +335,7 @@ Base.length(C::SimpleCommutator) =
 
 degree(g::Generator) = g.degree
 degree(C::SimpleCommutator) = degree(C.x)+degree(C.y) 
+degree(w::Word) = sum([degree(g) for g in w])
 
 leading_word(C::Generator) = Word([C])
 leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
