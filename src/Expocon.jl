@@ -683,9 +683,16 @@ function simplify(p::Product)
     end
     ex = normalize_lie_elements(ex)
     if iszero(ex)
-        return r*q
+       r =  r*q
     else
-       return r*Exponential(normalize_lie_elements(ex))*q
+       r =  r*Exponential(normalize_lie_elements(ex))*q
+    end
+    if isa(r, Product) && length(r)==1
+        return r.p[1]
+    elseif isa(r, Term) && isa(r.e, Product) && length(r.e.p)==1
+        return r.c*r.e.p[1]
+    else
+        return r
     end
 end
 
