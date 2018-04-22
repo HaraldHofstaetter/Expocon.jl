@@ -2,20 +2,20 @@ __precompile__()
 module Expocon
 
 import 
-Base: (*), /, +, -, show, convert, zero, one, expand
+Base: (*), /, +, -, show, convert, zero, one, expand, iszero
 
 export MultiFor
 export Element, Generator, SimpleCommutator, Commutator
 export Exponential, Product, Id, Term, LinearCombination
 export ZeroElement
-export terms
+export terms, factors, exponent
 export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
 export is_lie_element, is_homogenous_lie_element
 export coeff, coeffs, degree
-export distribute, expand_commutators, simplify
+export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
 
 abstract type Element end
@@ -50,12 +50,18 @@ struct Exponential <: Element
     e::Element
 end
 
+exponent(e::Exponential) = e.e
+
 Base.exp(e::Element) = Exponential(e)
 Base.show(io::IO, e::Exponential) = print(io, "exp(", e.e, ")")
 
 struct Product <: Element
     p::Array{Element,1}    
 end
+
+factors(p::Product) = p.p
+
+
 
 const Id = Product([])
 one(::Type{T}) where {T<:Element} = Id
@@ -121,6 +127,7 @@ const ZeroElement = LinearCombination([])
 
 zero(::Type{T}) where {T<:Element} = ZeroElement 
 zero(x::T) where {T<:Element} = zero(T)
+iszero(x::Element)= (isa(x, LinearCombination)&&length(x.l)==0)||(isa(x, Term)&&x.c==0)
 
 
 *(c, e::Element) = Term(c,e)
@@ -134,6 +141,8 @@ zero(x::T) where {T<:Element} = zero(T)
 *(x::Element, p::Product) = Product(vcat(x, p.p))
 *(p1::Product, p2::Product) = Product(vcat(p1.p, p2.p))
 *(e1::Element, e2::Element) = Product([e1, e2])
+*(p::Product, t::Term) = Term(t.c, p*t.e)
+*(t::Term, p::Product) = Term(t.c, t.e*p)
 *(t1::Term, t2::Term) = Term(t1.c*t2.c, t1.e*t2.e)
 *(t::Term, e::Element) = Term(t.c, t.e*e)
 *(e::Element, t::Term) = Term(t.c, e*t.e)
@@ -255,17 +264,17 @@ key(c::SimpleCommutator) = ('C', key(c.x), key(c.y))
 key(p::Product) = (vcat('P', [key(f) for f in p.p])...)
 key(l::LinearCombination) = (vcat('L', sort([key(t) for t in terms(l)]))...)
 
-simplify(g::Generator) = g
-simplify(e::Exponential) = Exponential(simplify(e.e))
-simplify(t::Term) = Term(t.c, simplify(t.e))
-simplify(c::SimpleCommutator) = Commutator(simplify(c.x), simplify(c.y))
-simplify(p::Product) = Product([simplify(f) for f in p.p])
+simplify_sum(g::Generator) = g
+simplify_sum(e::Exponential) = Exponential(simplify_sum(e.e))
+simplify_sum(t::Term) = Term(t.c, simplify_sum(t.e))
+simplify_sum(c::SimpleCommutator) = Commutator(simplify_sum(c.x), simplify_sum(c.y))
+simplify_sum(p::Product) = Product([simplify_sum(f) for f in p.p])
 
 
-function simplify(l::LinearCombination)
+function simplify_sum(l::LinearCombination)
     tab=Dict{Any, Term}()    
     for t0 in terms(l)
-        t = simplify(t0)
+        t = simplify_sum(t0)
         k = key(t.e)
         if haskey(tab, k)
             tab[k] = Term(tab[k].c+t.c, tab[k].e)
@@ -363,10 +372,12 @@ end
 
 
 Base.length(::Generator) = 1
+Base.length(t::Term) = length(t.e)
 Base.length(C::SimpleCommutator) = 
     (isa(C.x, SimpleCommutator)?length(C.x):1)+(isa(C.y, SimpleCommutator)?length(C.y):1)
 
 degree(g::Generator) = g.degree
+degree(t::Term) = degree(t.e)
 degree(C::SimpleCommutator) = degree(C.x)+degree(C.y) 
 degree(w::Word) = sum([degree(g) for g in w])
 
@@ -571,7 +582,6 @@ is_lie_element(t::Term)=is_lie_element(t.e)
 is_lie_element(c::SimpleCommutator) = is_lie_element(c.x) && is_lie_element(c.y)
 is_lie_element(l::LinearCombination) = all(is_lie_element.(terms(l))) 
 
-degree(t::Term) = degree(t.e)
 is_homogenous_lie_element(e::Element) = is_lie_element(e)
 is_homogenous_lie_element(l::LinearCombination) = is_lie_element(l) && (length(l.l)<=1 ||all(degree(l.l[1]).==degree.(l.l[2:end]))) 
 
@@ -591,6 +601,9 @@ max_length(t::Term) = max_length(t.e)
 max_length(l::LinearCombination) = maximum([max_length(t) for t in terms(l)])
 
 function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[])
+    if iszero(e)
+        return ZeroElement
+    end
     if !is_lie_element(e)
         return e
     end
@@ -611,7 +624,7 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
             push!(B, rightnormed_bracketing(wb))
         end
     end
-    r = simplify(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    r = simplify_sum(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
     if isa(r, LinearCombination)
         return  LinearCombination(sort(terms(r), lt=(x,y)->(degree(x.e)<degree(y.e))||
             ((degree(x.e)==degree(y.e))&&(findfirst(B, x.e)<findfirst(B, y.e)))))
@@ -624,6 +637,61 @@ normalize_lie_elements(e::Exponential; order::Array{Generator,1}=Generator[])=
     Exponential(normalize_lie_elements(e.e, order=order))
 normalize_lie_elements(p::Product; order::Array{Generator,1}=Generator[]) = 
     Product([normalize_lie_elements(f, order=order) for f in p.p])
+
+
+commutes(e1::Element, e2::Element) = iszero(normalize_lie_elements(Commutator(e1,e2)))
+commutes(e::Element, ex::Exponential) = commutes(e, exponent(ex))
+commutes(ex::Exponential, e::Element) = commutes(exponent(ex), e)
+commutes(ex1::Exponential, ex2::Exponential) = commutes(exponent(ex1), exponent(ex2))
+
+
+function simplify(p::Product)
+    if length(factors(p))==0
+        return Id
+    end
+    f = normalize_lie_elements.(factors(p))
+    r = Id
+    ex = ZeroElement
+    q = Id
+    if isa(f[1], Exponential)
+        ex = exponent(f[1])
+    else
+        q = f[1]
+    end
+    for j=2:length(f)
+        if !commutes(f[j-1], f[j])
+            ex = normalize_lie_elements(ex)
+            if iszero(ex)
+                r = r*q
+            else
+                r = r*Exponential(normalize_lie_elements(ex))*q
+            end
+            if isa(f[j], Exponential)
+                ex = exponent(f[j])
+                q = Id
+            else
+                ex = ZeroElement
+                q = f[j]
+            end
+        else
+            if isa(f[j], Exponential)
+                ex = ex + exponent(f[j])
+            else
+                q = q*f[j]
+            end
+        end
+    end
+    ex = normalize_lie_elements(ex)
+    if iszero(ex)
+        return r*q
+    else
+       return r*Exponential(normalize_lie_elements(ex))*q
+    end
+end
+
+simplify(e::Element) = normalize_lie_elements(e)
+simplify(t::Term) = t.c*simplify(t.e)
+simplify(l::LinearCombination) = simplify_sum(sum([simplify(t) for t in terms(l)]))
 
 
 function coeff(w::Word, e::Exponential)
