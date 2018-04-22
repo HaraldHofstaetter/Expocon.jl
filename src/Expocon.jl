@@ -16,6 +16,7 @@ export extend_by_rightmost_subwords, leading_word
 export is_lie_element, is_homogenous_lie_element
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify
+export generators, max_length, normalize_lie_elements
 
 abstract type Element end
 
@@ -562,6 +563,43 @@ function degree(l::LinearCombination)
     @assert is_homogenous_lie_element(l) "homogenous lie element expected"
     length(l.l)==0?-1:degree(l.l[1])
 end
+
+generators(g::Generator)=Set([g])
+generators(c::SimpleCommutator)=union(generators(c.x), generators(c.y))
+generators(t::Term)=generators(t.e)
+generators(l::LinearCombination) = union([generators(t) for t in terms(l)]...)
+
+max_length(g::Generator)=1
+max_length(c::SimpleCommutator) = max_length(c.x)+max_length(c.y)
+max_length(t::Term) = max_length(t.e)
+max_length(l::LinearCombination) = maximum([max_length(t) for t in terms(l)])
+
+function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[])
+    if !is_lie_element(e)
+        return e
+    end
+    G = collect(generators(e))
+    order = [g for g in order if g in G]
+    order = unique(vcat(order,G))
+    W = Word[]
+    B = SimpleCommutator[]
+    c = Any[]
+    for w in Lyndon(length(order), max_length(e))
+        w1 = Word([order[g+1] for g in w])
+        c0 = coeff(w1, e)
+        if c0!=0
+            push!(c, c0)
+            push!(W, w1)
+            push!(B, rightnormed_bracketing(Word([order[g+1] for g in Expocon.lyndon2rightnormed(w)])))
+        end
+    end
+    simplify(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+end
+
+normalize_lie_elements(e::Exponential; order::Array{Generator,1}=Generator[])=
+    Exponential(normalize_lie_elements(e.e, order=order))
+normalize_lie_elements(p::Product; order::Array{Generator,1}=Generator[]) = 
+    Product([normalize_lie_elements(f, order=order) for f in p.p])
 
 
 function coeff(w::Word, e::Exponential)
