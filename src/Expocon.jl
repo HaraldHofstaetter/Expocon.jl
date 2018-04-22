@@ -145,6 +145,8 @@ zero(x::T) where {T<:Element} = zero(T)
 +(l1::LinearCombination, l2::LinearCombination) = LinearCombination(vcat(l1.l, l2.l))
 +(l::LinearCombination, t::Term) = LinearCombination(vcat(l.l, t))
 +(t::Term, l::LinearCombination) = LinearCombination(vcat(t, l.l))
++(l::LinearCombination, e::Element) = LinearCombination(vcat(l.l, vcat(convert(Term, e))))
++(e::Element, l::LinearCombination) = LinearCombination(vcat(vcat(convert(Term, e), l.l)))
 +(t1::Term, t2::Term) =  LinearCombination(vcat(t1, t2))
 +(e1::Element, e2::Element) = LinearCombination(vcat(convert(Term, e1), convert(Term, e2)))
 +(e::Element) = e
@@ -206,6 +208,12 @@ distribute(l1::LinearCombination, l2::LinearCombination) = sum([t1*t2 for t1 in 
 distribute(e::Element, l::LinearCombination) = distribute(Term(e), l)
 distribute(l::LinearCombination, e::Element) = distribute(l, Term(e))
 
+distribute_commutators(e1::Element, e2::Element) = SimpleCommutator(e1, e2)
+distribute_commutators(t::Term, l::LinearCombination) = sum([t.c*t1.c*SimpleCommutator(t.e,t1.e) for t1 in terms(l)])
+distribute_commutators(l::LinearCombination, t::Term) = sum([t1.c*t.c*SimpleCommutator(t1.e,t.e) for t1 in terms(l)]) 
+distribute_commutators(l1::LinearCombination, l2::LinearCombination) = sum([t1.c*t2.c*SimpleCommutator(t1.e,t2.e) for t1 in terms(l1) for t2 in terms(l2)]) 
+distribute_commutators(e::Element, l::LinearCombination) = distribute_commutators(Term(e), l)
+distribute_commutators(l::LinearCombination, e::Element) = distribute_commutators(l, Term(e))
 
 Base.expand(e::Element) = e
 
@@ -231,6 +239,13 @@ function Base.expand(p::Product)
         return r
     end
 end
+
+function Base.expand(c::SimpleCommutator)
+    x = expand(c.x)
+    y = expand(c.y)
+    distribute_commutators(x, y)
+end
+
 
 
 key(g::Generator) = ('G', g.name)
@@ -263,6 +278,7 @@ function simplify(l::LinearCombination)
     end
     LinearCombination(collect(values(tab)))
 end
+
 
 
 
@@ -578,11 +594,12 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
     if !is_lie_element(e)
         return e
     end
-    G = collect(generators(e))
+    G = sort(collect(generators(e)), lt=(x,y)->x.name<y.name)
+    e = expand(e)
     order = [g for g in order if g in G]
     order = unique(vcat(order,G))
     W = Word[]
-    B = SimpleCommutator[]
+    B = Element[] # Generator or SimpleCommutator
     c = Any[]
     for w in Lyndon(length(order), max_length(e))
         w1 = Word([order[g+1] for g in w])
@@ -590,10 +607,17 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
         if c0!=0
             push!(c, c0)
             push!(W, w1)
-            push!(B, rightnormed_bracketing(Word([order[g+1] for g in Expocon.lyndon2rightnormed(w)])))
+            wb = Word([order[g+1] for g in Expocon.lyndon2rightnormed(w)])
+            push!(B, rightnormed_bracketing(wb))
         end
     end
-    simplify(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    r = simplify(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    if isa(r, LinearCombination)
+        return  LinearCombination(sort(terms(r), lt=(x,y)->(degree(x.e)<degree(y.e))||
+            ((degree(x.e)==degree(y.e))&&(findfirst(B, x.e)<findfirst(B, y.e)))))
+    else
+        return r
+    end
 end
 
 normalize_lie_elements(e::Exponential; order::Array{Generator,1}=Generator[])=
