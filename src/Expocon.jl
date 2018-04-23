@@ -127,7 +127,10 @@ const ZeroElement = LinearCombination([])
 
 zero(::Type{T}) where {T<:Element} = ZeroElement 
 zero(x::T) where {T<:Element} = zero(T)
-iszero(x::Element)= (isa(x, LinearCombination)&&length(x.l)==0)||(isa(x, Term)&&x.c==0)
+
+iszero(x::Element) = false
+iszero(l::LinearCombination) = length(l.l)==0
+iszero(t::Term) = t.c==0 || iszero(t.e)
 
 
 *(c, e::Element) = Term(c,e)
@@ -150,6 +153,9 @@ iszero(x::Element)= (isa(x, LinearCombination)&&length(x.l)==0)||(isa(x, Term)&&
 *(e::Element, l::LinearCombination) = Product([e, l])
 *(l::LinearCombination, p::Product) = Product([l, p]) 
 *(p::Product, l::LinearCombination) = Product([p, l])
+# the following seems to give trouble:
+#*(l::LinearCombination, t::Term) = t.c*(l*t.e) 
+#*(t::Term, l::LinearCombination) = t.c*(t.e*l)
 
 +(l1::LinearCombination, l2::LinearCombination) = LinearCombination(vcat(l1.l, l2.l))
 +(l::LinearCombination, t::Term) = LinearCombination(vcat(l.l, t))
@@ -624,7 +630,9 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
             push!(B, rightnormed_bracketing(wb))
         end
     end
+    # TODO: Check if conversion to integer matrix is indeed allowed !!!
     r = simplify_sum(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    #r = simplify_sum(LinearCombination(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
     if isa(r, LinearCombination)
         return  LinearCombination(sort(terms(r), lt=(x,y)->(degree(x.e)<degree(y.e))||
             ((degree(x.e)==degree(y.e))&&(findfirst(B, x.e)<findfirst(B, y.e)))))
@@ -650,28 +658,38 @@ function simplify(p::Product)
         return Id
     end
     f = normalize_lie_elements.(factors(p))
+    F = Tuple{Element, Element, Element}[] # (cummulative exponent ex, cummulative factors q, witness)
     r = Id
     ex = ZeroElement
     q = Id
     if isa(f[1], Exponential)
         ex = exponent(f[1])
+        wit = ex
     else
         q = f[1]
+        wit = q
     end
     for j=2:length(f)
         if !commutes(f[j-1], f[j])
+            push!(F, (ex, q, wit))
+
+            ### to be removed
             ex = normalize_lie_elements(ex)
             if iszero(ex)
                 r = r*q
             else
-                r = r*Exponential(normalize_lie_elements(ex))*q
+                r = r*Exponential(ex)*q
             end
+            ###
+
             if isa(f[j], Exponential)
                 ex = exponent(f[j])
                 q = Id
+                wit = ex
             else
                 ex = ZeroElement
                 q = f[j]
+                wit = q 
             end
         else
             if isa(f[j], Exponential)
@@ -681,13 +699,18 @@ function simplify(p::Product)
             end
         end
     end
+    push!(F, (ex, q, wit))
+
+    ### to be removed
     ex = normalize_lie_elements(ex)
     if iszero(ex)
        r =  r*q
     else
-       r =  r*Exponential(normalize_lie_elements(ex))*q
+       r =  r*Exponential(ex)*q
     end
-    if isa(r, Product) && length(r)==1
+    ###
+
+    if isa(r, Product) && length(r.p)==1
         return r.p[1]
     elseif isa(r, Term) && isa(r.e, Product) && length(r.e.p)==1
         return r.c*r.e.p[1]
@@ -695,6 +718,7 @@ function simplify(p::Product)
         return r
     end
 end
+
 
 simplify(e::Element) = normalize_lie_elements(e)
 simplify(t::Term) = t.c*simplify(t.e)
