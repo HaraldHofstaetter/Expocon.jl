@@ -670,7 +670,6 @@ function simplify(p::Product)
     end
     f = normalize_lie_elements.(factors(p))
     F = Tuple{Element, Element, Element}[] # (cummulative exponent ex, cummulative factors q, witness)
-    # r = Id
     ex = ZeroElement
     q = Id
     if isa(f[1], Exponential)
@@ -704,7 +703,6 @@ function simplify(p::Product)
     end
     ex = simplify_sum(ex)
     push!(F, (ex, q, wit))
-    println(F)
 
     j = 1
     while true
