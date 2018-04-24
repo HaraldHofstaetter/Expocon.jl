@@ -411,7 +411,7 @@ inv(p::Product) = Product(reverse(inv.(factors(p))))
 inv(ex::Exponential) = Exponential(-exponent(ex))
 inv(t::Term) = (isa(t.c,Int)?1//t.c:1/t.c)*inv(t.e)
 
-diff(g::Generator) = degree(g)==1?g:error("diff not applicaple for generators of degree >1")
+diff(g::Generator) = degree(g)*g
 diff(t::Term) = t.c*diff(t.e)
 diff(l::LinearCombination) = sum(diff.(terms(l)))
 diff(e::Exponential) = diff(exponent(e))*e
@@ -662,8 +662,7 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
             push!(B, rightnormed_bracketing(wb))
         end
     end
-    # TODO: Check if conversion to integer matrix is indeed allowed !!!
-    r = simplify_sum(LinearCombination(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    r = simplify_sum(LinearCombination(inv(Rational{Int}[coeff(w, b) for w in W, b in B])*c.*B))
     if isa(r, LinearCombination)
         return  LinearCombination(sort(terms(r), lt=(x,y)->(degree(x.e)<degree(y.e))||
             ((degree(x.e)==degree(y.e))&&(findfirst(B, x.e)<findfirst(B, y.e)))))
