@@ -2,7 +2,7 @@ __precompile__()
 module Expocon
 
 import 
-Base: (*), /, +, -, show, convert, zero, one, expand, iszero
+Base: (*), /, +, -, show, convert, zero, one, expand, iszero, inv, diff
 
 export MultiFor
 export Element, Generator, SimpleCommutator, Commutator
@@ -14,6 +14,7 @@ export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
 export is_id, is_lie_element, is_homogenous_lie_element
+export adjoint
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
@@ -399,6 +400,27 @@ degree(w::Word) = sum([degree(g) for g in w])
 
 leading_word(C::Generator) = Word([C])
 leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
+
+adjoint(e::Element) = e
+adjoint(p::Product) = Product(reverse(factors(p)))
+adjoint(t::Term) = t.c*adjoint(t.e)
+adjoint(l::LinearCombination) = sum(adjoint.(terms(l)))
+
+inv(e::Element) = error("not inverible")
+inv(p::Product) = Product(reverse(inv.(factors(p))))
+inv(ex::Exponential) = Exponential(-exponent(ex))
+inv(t::Term) = (isa(t.c,Int)?1//t.c:1/t.c)*inv(t.e)
+
+diff(g::Generator) = degree(g)==1?g:error("diff not applicaple for generators of degree >1")
+diff(t::Term) = t.c*diff(t.e)
+diff(l::LinearCombination) = sum(diff.(terms(l)))
+diff(e::Exponential) = diff(exponent(e))*e
+diff(c::SimpleCommutator) = SimpleCommutator(diff(c.x), c.y)+SimpleCommutator(c.x, diff(c.y))
+function diff(p::Product)
+    f = factors(p)
+    sum([prod(vcat(f[1:j-1], diff(f[j]), f[j+1:end])) for j=1:length(f)])
+end
+
 
 function extend_by_rightmost_subwords(W::Array{Word, 1})
     WW=Dict{Word,Int}(Word([])=>1)
