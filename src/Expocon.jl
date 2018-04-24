@@ -13,7 +13,7 @@ export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
-export is_lie_element, is_homogenous_lie_element
+export is_id, is_lie_element, is_homogenous_lie_element
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
@@ -66,6 +66,7 @@ factors(p::Product) = p.p
 const Id = Product([])
 one(::Type{T}) where {T<:Element} = Id
 one(x::T) where {T<:Element} = one(T)
+
 
 
 function Base.show(io::IO, p::Product) 
@@ -131,6 +132,10 @@ zero(x::T) where {T<:Element} = zero(T)
 iszero(x::Element) = false
 iszero(l::LinearCombination) = length(l.l)==0
 iszero(t::Term) = t.c==0 || iszero(t.e)
+
+is_id(e::Element) = false
+is_id(p::Product) = length(factors(p))==0
+is_id(t::Term) = is_id(t.e)&&t.c==1
 
 
 *(c, e::Element) = Term(c,e)
@@ -659,7 +664,7 @@ function simplify(p::Product)
     end
     f = normalize_lie_elements.(factors(p))
     F = Tuple{Element, Element, Element}[] # (cummulative exponent ex, cummulative factors q, witness)
-    r = Id
+    # r = Id
     ex = ZeroElement
     q = Id
     if isa(f[1], Exponential)
@@ -671,16 +676,8 @@ function simplify(p::Product)
     end
     for j=2:length(f)
         if !commutes(f[j-1], f[j])
+            ex = simplify_sum(ex)
             push!(F, (ex, q, wit))
-
-            ### to be removed
-            ex = normalize_lie_elements(ex)
-            if iszero(ex)
-                r = r*q
-            else
-                r = r*Exponential(ex)*q
-            end
-            ###
 
             if isa(f[j], Exponential)
                 ex = exponent(f[j])
@@ -699,16 +696,41 @@ function simplify(p::Product)
             end
         end
     end
+    ex = simplify_sum(ex)
     push!(F, (ex, q, wit))
 
-    ### to be removed
-    ex = normalize_lie_elements(ex)
-    if iszero(ex)
-       r =  r*q
-    else
-       r =  r*Exponential(ex)*q
+    j = 1
+    while true
+        if j>length(F)
+            break
+        end
+        (ex, q, wit) = F[j]
+        if iszero(ex)&&is_id(q)
+            F = vcat(F[1:j-1],F[j+1:end]) #remove F[j]
+            if j>1&&j<=length(F)
+                (ex1, q1, wit1) = F[j-1]
+                (ex2, q2, wit2) = F[j]
+                if commutes(wit1, wit2)
+                    q = q1*q2
+                    ex = simplify_sum(ex1+ex2)
+                    F[j-1] = (ex, q, wit1)
+                    F = vcat(F[1:j-1],F[j+1:end]) #remove F[j]
+                end
+            end
+            j = max(1, j-1)
+        else
+            j += 1
+        end
     end
-    ###
+
+    r = Id
+    for j=1:length(F)
+        (ex, q, wit) = F[j]
+        r = r*q
+        if !iszero(ex)
+            r = r*Exponential(ex)
+        end
+    end
 
     if isa(r, Product) && length(r.p)==1
         return r.p[1]
