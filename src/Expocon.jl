@@ -138,29 +138,22 @@ is_id(p::Product) = length(factors(p))==0
 is_id(t::Term) = is_id(t.e)&&t.c==1
 
 
-*(c, e::Element) = Term(c,e)
-*(e::Element, c) = Term(c,e)
-*(c, t::Term) = Term(c*t.c,t.e)
-*(t::Term, c) = Term(c*t.c,t.e)
-*(c, l::LinearCombination) = LinearCombination([c*t for t in terms(l)])
-*(l::LinearCombination, c) = LinearCombination([c*t for t in terms(l)])
+*(c, e::Element) = c==1?e:Term(c,e)
+*(e::Element, c) = c==1?e:Term(c,e)
+*(c, t::Term) = (c*t.c)*t.e
+*(t::Term, c) = (c*t.c)*t.e
+#*(c, t::Term) = Term(c*t.c,t.e)
+#*(t::Term, c) = Term(c*t.c,t.e)
 
 *(p::Product, x::Element) = Product(vcat(p.p, x))
 *(x::Element, p::Product) = Product(vcat(x, p.p))
 *(p1::Product, p2::Product) = Product(vcat(p1.p, p2.p))
 *(e1::Element, e2::Element) = Product([e1, e2])
-*(p::Product, t::Term) = Term(t.c, p*t.e)
-*(t::Term, p::Product) = Term(t.c, t.e*p)
-*(t1::Term, t2::Term) = Term(t1.c*t2.c, t1.e*t2.e)
-*(t::Term, e::Element) = Term(t.c, t.e*e)
-*(e::Element, t::Term) = Term(t.c, e*t.e)
-*(l::LinearCombination, e::Element) = iszero(l)||iszero(e)?ZeroElement:Product([l, e]) 
-*(e::Element, l::LinearCombination) = iszero(l)||iszero(e)?ZeroElement:Product([e, l])
-*(l::LinearCombination, p::Product) = iszero(l)?ZeroElement:Product(vcat(l, p)) 
-*(p::Product, l::LinearCombination) = iszero(l)?ZeroElement:Product(vcat(p, l))
-# the following seems to give trouble:
-#*(l::LinearCombination, t::Term) = t.c*(l*t.e) 
-#*(t::Term, l::LinearCombination) = t.c*(t.e*l)
+*(p::Product, t::Term) = t.c*(p*t.e)
+*(t::Term, p::Product) = t.c*(t.e*p)
+*(t1::Term, t2::Term) = (t1.c*t2.c)*(t1.e*t2.e)
+*(t::Term, e::Element) = t.c*(t.e*e)
+*(e::Element, t::Term) = t.c*(e*t.e)
 
 +(l1::LinearCombination, l2::LinearCombination) = LinearCombination(vcat(l1.l, l2.l))
 +(l::LinearCombination, t::Term) = LinearCombination(vcat(l.l, t))
@@ -296,7 +289,19 @@ function simplify_sum(l::LinearCombination)
             delete!(tab, k) 
         end     
     end
-    LinearCombination(collect(values(tab)))
+    r =  collect(values(tab))
+    if length(r) == 0
+        return ZeroElement
+    elseif length(r) == 1
+        t = r[1]
+        if t.c==1
+            return t.e
+        else
+            return t
+        end
+    else
+        return LinearCombination(r)
+    end
 end
 
 
@@ -636,11 +641,12 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
         end
     end
     # TODO: Check if conversion to integer matrix is indeed allowed !!!
-    r = simplify_sum(sum(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
-    #r = simplify_sum(LinearCombination(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
+    r = simplify_sum(LinearCombination(convert(Array{Int,2}, inv(Rational{Int}[coeff(w, b) for w in W, b in B]))*c.*B))
     if isa(r, LinearCombination)
         return  LinearCombination(sort(terms(r), lt=(x,y)->(degree(x.e)<degree(y.e))||
             ((degree(x.e)==degree(y.e))&&(findfirst(B, x.e)<findfirst(B, y.e)))))
+    elseif isa(r, Term) && r.c==1
+        return r.e 
     else
         return r
     end
@@ -698,6 +704,7 @@ function simplify(p::Product)
     end
     ex = simplify_sum(ex)
     push!(F, (ex, q, wit))
+    println(F)
 
     j = 1
     while true
@@ -717,7 +724,7 @@ function simplify(p::Product)
                     F = vcat(F[1:j-1],F[j+1:end]) #remove F[j]
                 end
             end
-            j = max(1, j-1)
+            j = 1 #max(1, j-1)
         else
             j += 1
         end
@@ -735,7 +742,7 @@ function simplify(p::Product)
     if isa(r, Product) && length(r.p)==1
         return r.p[1]
     elseif isa(r, Term) && isa(r.e, Product) && length(r.e.p)==1
-        return r.c*r.e.p[1]
+        return r.c*(r.e.p[1])
     else
         return r
     end
