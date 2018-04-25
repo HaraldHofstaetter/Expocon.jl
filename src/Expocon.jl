@@ -374,14 +374,15 @@ function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false,
 end
 
 function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, 
-                      all_lower_terms::Bool=true)
+                      all_lower_terms::Bool=true, max_generator_order::Integer=n)
     s = length(G)
     @assert s==length(unique(G)) "Generators must be distinct"
     r = Word[]
     for w0 in Lyndon(s,n)
         w = Word(G[w0+1])
         d = degree(w)
-        if  ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d))
+        if  ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
+            (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
             push!(r, w)
         end
     end
@@ -448,10 +449,12 @@ function lyndon_bracketing(w::Word, W::Array{Word, 1})
 end
 
 function lyndon_basis(G::Array{Generator,1}, n::Integer; 
-                      odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
+                      odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
+                      max_generator_order::Integer=n) 
     W = lyndon_words(G, n)
     [lyndon_bracketing(w, W) for w in W if
-        (all_lower_terms || length(w)==n) && (!odd_terms_only || isodd(length(w)))]
+     ((all_lower_terms && degree(w)<=n) || degree(w)==n) && (!odd_terms_only || isodd(degree(w))) &&
+     (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)]
 end
 
 function analyze_lyndon_word(w::Array{Int,1})
@@ -554,8 +557,10 @@ function lyndon2rightnormed(w::Array{Int, 1})
 end
 
 
-function rightnormed_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, all_lower_terms::Bool=true)
-    W = lyndon_words(G, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms)
+function rightnormed_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, 
+                           all_lower_terms::Bool=true, max_generator_order::Integer=n)
+    W = lyndon_words(G, n, odd_terms_only=odd_terms_only, all_lower_terms=all_lower_terms,
+                    max_generator_order=max_generator_order)
     [Word([G[g+1] for g in lyndon2rightnormed([findfirst(G,g)-1 for g in w])]) for w in W]
 end
 
@@ -569,8 +574,10 @@ end
 
 
 function rightnormed_basis(G::Array{Generator,1}, n::Integer; 
-                      odd_terms_only::Bool=false, all_lower_terms::Bool=true) 
-    W = rightnormed_words(G, n, odd_terms_only= odd_terms_only, all_lower_terms=all_lower_terms)
+                      odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
+                      max_generator_order::Integer=n) 
+    W = rightnormed_words(G, n, odd_terms_only= odd_terms_only, all_lower_terms=all_lower_terms,
+                      max_generator_order=max_generator_order)
     [rightnormed_bracketing(w) for w in W]
 end
 
