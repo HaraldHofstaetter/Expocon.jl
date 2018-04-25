@@ -18,6 +18,7 @@ export adjoint
 export coeff, coeffs, degree
 export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
+export commute
 
 abstract type Element end
 
@@ -679,10 +680,45 @@ normalize_lie_elements(p::Product; order::Array{Generator,1}=Generator[]) =
     Product([normalize_lie_elements(f, order=order) for f in p.p])
 
 
-commutes(e1::Element, e2::Element) = iszero(normalize_lie_elements(Commutator(e1,e2)))
-commutes(e::Element, ex::Exponential) = commutes(e, exponent(ex))
-commutes(ex::Exponential, e::Element) = commutes(exponent(ex), e)
-commutes(ex1::Exponential, ex2::Exponential) = commutes(exponent(ex1), exponent(ex2))
+#commute(e1::Element, e2::Element) = iszero(normalize_lie_elements(Commutator(e1,e2)))
+#commute(e::Element, ex::Exponential) = commute(e, exponent(ex))
+#commute(ex::Exponential, e::Element) = commute(exponent(ex), e)
+#commute(ex1::Exponential, ex2::Exponential) = commute(exponent(ex1), exponent(ex2))
+
+commute_normalized(e1::Element, e2::Element) =  false
+commute_normalized(t::Term, e::Element) =  commute_normalized(t.e, e) 
+commute_normalized(e::Element, t::Term) =  commute_normalized(e, t.e) 
+commute_normalized(t1::Term, t2::Term) =  commute_normalized(t1.e, t2.e) 
+commute_normalized(g1::Generator, g2::Generator) = g1==g2
+commute_normalized(c1::SimpleCommutator, c2::SimpleCommutator) = c1==c2
+
+function commute_normalized(l1::LinearCombination, l2::LinearCombination)
+    t1 = terms(l1)
+    t2 = terms(l2)
+    if length(t1)!=length(t2)
+        return false
+    elseif length(t1)==0
+        return true
+    end
+    f = commute_normalized(t1[1].e, t2[1].e)
+    if !f || length(t1)==1
+        return f 
+    end
+    c1 = t1[1].c
+    c2 = t2[1].c
+    for j=2:length(t1)
+        if !commute_normalized(t1[j].e, t2[j].e) || c1*t2[j].c!=c2*t1[j].c
+            return false
+        end
+    end
+    return true
+end
+
+commute_normalized(e::Element, ex::Exponential) = commute_normalized(e, exponent(ex))
+commute_normalized(ex::Exponential, e::Element) = commute_normalized(exponent(ex), e)
+commute_normalized(ex1::Exponential, ex2::Exponential) = commute_normalized(exponent(ex1), exponent(ex2))
+
+commute(e1::Element, e2::Element) = commute_normalized(normalize_lie_elements(e1),normalize_lie_elements(e2))
 
 
 function simplify(p::Product)
@@ -701,7 +737,7 @@ function simplify(p::Product)
         wit = q
     end
     for j=2:length(f)
-        if !commutes(f[j-1], f[j])
+        if !commute_normalized(f[j-1], f[j])
             ex = simplify_sum(ex)
             push!(F, (ex, q, wit))
 
@@ -736,7 +772,7 @@ function simplify(p::Product)
             if j>1&&j<=length(F)
                 (ex1, q1, wit1) = F[j-1]
                 (ex2, q2, wit2) = F[j]
-                if commutes(wit1, wit2)
+                if commute_normalized(wit1, wit2)
                     q = q1*q2
                     ex = simplify_sum(ex1+ex2)
                     F[j-1] = (ex, q, wit1)
