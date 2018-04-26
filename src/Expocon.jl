@@ -415,8 +415,10 @@ degree(w::Word) = sum([degree(g) for g in w])
 leading_word(C::Generator) = Word([C])
 leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
 
-adjoint(e::Element) = e
-adjoint(p::Product) = Product(reverse(factors(p)))
+adjoint(g::Generator) = isodd(degree(g))?g:-g
+adjoint(p::Product) = Product(adjoint.(reverse(factors(p))))
+adjoint(e::Exponential) = Exponential(adjoint(e.e))
+adjoint(c::SimpleCommutator) = SimpleCommutator(adjoint(c.y), adjoint(c.x))        
 adjoint(t::Term) = t.c*adjoint(t.e)
 adjoint(l::LinearCombination) = sum(adjoint.(terms(l)))
 
