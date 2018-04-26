@@ -19,12 +19,18 @@ export coeff, coeffs, degree
 export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
 export commute
+export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
+export splitting_method
 
 abstract type Element end
 
 struct Generator <: Element
     name   ::String
     degree ::Int
+    function Generator(name, degree)
+        @assert degree>=1 "degree has to be >=1"
+        new(name, degree)
+    end
 end
 
 Generator(name::String) = Generator(name, 1)
@@ -336,6 +342,9 @@ function Base.show(io::IO, w::Word)
         end
     end
 end
+
+generators(w::Word)=Set(w)
+generators(W::Array{Word}) = union(generators.(W)...)
 
 immutable Lyndon
     s::Int
@@ -873,6 +882,106 @@ coeff(w::Word, p::Product) = coeffs([w], p)[1]
 
 coeffs(W::Array{Word,1}, e::Element) = [coeff(w, e) for w in W]
 
+
+function rhs_splitting(W::Array{Word}) 
+    G = degree.(collect(generators(W)))
+    @assert all(G.==1) "Generators must have degree 1"
+    [1//factorial(length(w)) for w in W]
+end
+
+function rhs_taylor(W::Array{Word})
+    G = degree.(collect(generators(W)))
+    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
+    T = Rational{Int}    
+    n = length(W)
+    c = zeros(T, n)
+    W1 = [[degree(g) for g in w] for w in W]
+    p = maximum([sum(w) for w in W1])
+    for i=1:n
+        w = W1[i]
+        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
+    end
+    c
+end    
+
+
+function rhs_taylor_symmetric(W::Array{Word})
+    G = degree.(collect(generators(W)))
+    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
+    T = Rational{Int}    
+    n = length(W)
+    c = zeros(T, n)
+    W1 = [[degree(g) for g in w] for w in W]
+    p = maximum([sum(w) for w in W1])
+    Cinv = T[(-1)^(m+n)*(n>=m?binomial(n,m)//2^(n-m):0) for m=0:p-1, n=0:p-1]
+    for i=1:n
+        w = W1[i]
+        l = length(w)
+        s = zero(T)
+        for v in MultiFor(w-1)
+            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
+        end
+        c[i] = s
+    end
+    c
+end
+
+
+function rhs_legendre(W::Array{Word})
+    G = degree.(collect(generators(W)))
+    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
+    T = Rational{Int}    
+    n = length(W)
+    c = zeros(T, n)
+    W1 = [[degree(g) for g in w] for w in W]
+    p = maximum([sum(w) for w in W1])
+    Cinv = T[(-1)^(m+n)*binomial(n,m)*binomial(n+m,m) for m=0:p-1, n=0:p-1]
+    for i=1:n
+        w = W1[i]
+        l = length(w)
+        s = zero(T)
+        for v in MultiFor(w-1)
+            s += prod([Cinv[v[j]+1,w[j]]/sum([v[i]+1 for i=j:l]) for j=1:l])
+        end
+        c[i] = s
+    end
+    c
+end
+
+
+function splitting_method(A::Generator, a::Vector, B::Generator, b::Vector)   
+    sa = length(a)
+    sb = length(b)
+    ex = Id
+    for j=1:max(sa, sb)
+        if j<=sa && a[j]!=0
+            ex = exp(a[j]*A)*ex
+        end
+        if j<=sb && b[j]!=0
+            ex = exp(b[j]*B)*ex
+        end
+    end
+    ex
+end
+
+function splitting_method(A::Generator, a::Vector, B::Generator, b::Vector, C::Generator, c::Vector)   
+    sa = length(a)
+    sb = length(b)
+    sc = length(c)
+    ex = Id
+    for j=1:max(sa, sb, sc)
+        if j<=sa && a[j]!=0
+            ex = exp(a[j]*A)*ex
+        end
+        if j<=sb && b[j]!=0
+            ex = exp(b[j]*B)*ex
+        end
+        if j<=sc && c[j]!=0
+            ex = exp(c[j]*C)*ex
+        end
+    end
+    ex
+end
 
 
 end # Expocon
