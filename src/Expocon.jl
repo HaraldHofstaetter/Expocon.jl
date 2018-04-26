@@ -66,6 +66,7 @@ Base.show(io::IO, e::Exponential) = print(io, "exp(", e.e, ")")
 struct Product <: Element
     p::Array{Element,1}    
 end
+#Note factors stored form right to left
 
 factors(p::Product) = p.p
 
@@ -81,12 +82,14 @@ function Base.show(io::IO, p::Product)
     if length(p.p)==0
         print(io, "Id")
     else
-        i = start(p.p)
-        is_done = done(p.p,i)
+        f = reverse(factors(p))
+        # Note: Output in reverse order!
+        i = start(f)
+        is_done = done(f,i)
         while !is_done
-            e, i = next(p.p,i)
-            is_done = done(p.p,i)
-            if isa(e, LinearCombination) && length(p.p)>1
+            e, i = next(f,i)
+            is_done = done(f,i)
+            if isa(e, LinearCombination) && length(f)>1
                 print(io, "(", e, ")")
             else
                 print(io, e)
