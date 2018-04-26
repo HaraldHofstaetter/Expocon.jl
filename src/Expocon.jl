@@ -20,7 +20,7 @@ export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
-export splitting_method
+export splitting_method, mult_t, composite
 
 abstract type Element end
 
@@ -987,6 +987,20 @@ function splitting_method(A::Generator, a::Vector, B::Generator, b::Vector, C::G
     end
     ex
 end
+
+mult_t(e::Exponential, c) = mult_t(e.e, c)
+mult_t(g::Generator, c) = c^degree(g)*g
+mult_t(t::Term, c) = t.c*mult_t(t.e, c)
+mult_t(C::SimpleCommutator, c) = SimpleCommutator(mult_t(C.x, c), mult_t(C.y, c))
+mult_t(p::Product, c) = Product([mult_t(f, c) for f in factors(p)])
+mult_t(l::LinearCombination, c) = LinearCombination([mult_t(t, c) for t in terms(l)])
+
+function composition(Phi::Product, g::Vector)
+    @assert all([isa(f, Exponential) for f in factors(Phi)]) 
+    prod([prod([Exponential(mult_t(f.e, c)) for f in factors(Phi)]) for c in g])
+end
+
+composition(Phi::Exponential, g::Vector) = composition(Product([Phi]), g)
 
 
 end # Expocon
