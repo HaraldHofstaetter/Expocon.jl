@@ -82,8 +82,7 @@ function Base.show(io::IO, p::Product)
     if length(p.p)==0
         print(io, "Id")
     else
-        f = reverse(factors(p))
-        # Note: Output in reverse order!
+        f = factors(p)
         i = start(f)
         is_done = done(f,i)
         while !is_done
@@ -864,7 +863,8 @@ end
 function coeffs(W::Array{Word, 1}, p::Product)
     W1 = extend_by_rightmost_subwords(W)
     m = length(W1)
-    J = length(p.p)
+    f = reverse(factors(p))
+    J = length(f)
     M = Any[0 for i=1:m, j=1:m]
     c = Any[0 for i=1:m]
     c[1] = 1
@@ -874,7 +874,7 @@ function coeffs(W::Array{Word, 1}, p::Product)
                 r = length(W1[k])-length(W1[l])
                 if r>=0 && W1[k][r+1:end]==W1[l]
                     w = W1[k][1:r]
-                    M[k,l]  = coeff(w, p.p[j])
+                    M[k,l]  = coeff(w, f[j])
                 end
             end
         end 
@@ -894,20 +894,44 @@ function rhs_splitting(W::Array{Word})
     [1//factorial(length(w)) for w in W]
 end
 
-function rhs_taylor(W::Array{Word})
-    G = degree.(collect(generators(W)))
-    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
-    T = Rational{Int}    
-    n = length(W)
-    c = zeros(T, n)
-    W1 = [[degree(g) for g in w] for w in W]
-    p = maximum([sum(w) for w in W1])
-    for i=1:n
-        w = W1[i]
-        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
+#function rhs_taylor(W::Array{Word})
+#    G = degree.(collect(generators(W)))
+#    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
+#    T = Rational{Int}    
+#    n = length(W)
+#    c = zeros(T, n)
+#    W1 = [[degree(g) for g in w] for w in W]
+#    p = maximum([sum(w) for w in W1])
+#    for i=1:n
+#        w = W1[i]
+#        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
+#    end
+#    c
+#end    
+
+function coeff_u(w::Array{Int,1})       
+    l = length(w)
+    if l==0
+        return 1
     end
-    c
-end    
+    r = 0
+    for k=1:l
+        if w[k]>0
+            w1 = copy(w)
+            w1[k] -= 1
+            r += coeff_u(w1)
+        end        
+    end
+    if w[l]==0
+        r += coeff_u(w[1:l-1])
+    end
+    r
+end
+
+rhs_taylor(w::Array{Int,1}) = coeff_u(w)//factorial(sum(w+1))
+rhs_taylor(w::Word) = rhs_taylor([degree(c)-1 for c in w])
+rhs_taylor(W::Array{Word,1}) = rhs_taylor.(W)
+
 
 
 function rhs_taylor_symmetric(W::Array{Word})
