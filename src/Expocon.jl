@@ -20,7 +20,7 @@ export distribute, expand_commutators, simplify_sum, simplify
 export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
-export splitting_method, mult_t, composite
+export splitting_method, mult_t, composition
 
 abstract type Element end
 
@@ -676,12 +676,12 @@ function normalize_lie_elements(e::Element; order::Array{Generator,1}=Generator[
     for w in Lyndon(length(order), max_length(e))
         w1 = Word([order[g+1] for g in w])
         c0 = coeff(w1, e)
-        if c0!=0
+        #if c0!=0  #TODO! check efficiency!!!
             push!(c, c0)
             push!(W, w1)
             wb = Word([order[g+1] for g in Expocon.lyndon2rightnormed(w)])
             push!(B, rightnormed_bracketing(wb))
-        end
+        #end
     end
     r = simplify_sum(LinearCombination(inv(Rational{Int}[coeff(w, b) for w in W, b in B])*c.*B))
     if isa(r, LinearCombination)
@@ -826,7 +826,7 @@ end
 
 simplify(e::Element) = normalize_lie_elements(e)
 simplify(t::Term) = t.c*simplify(t.e)
-simplify(l::LinearCombination) = simplify_sum(sum([simplify(t) for t in terms(l)]))
+simplify(l::LinearCombination) = simplify_sum(sum([expand(simplify(t)) for t in terms(l)]))
 
 
 function coeff(w::Word, e::Exponential)
