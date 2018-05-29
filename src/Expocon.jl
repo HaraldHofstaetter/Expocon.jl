@@ -894,44 +894,19 @@ function rhs_splitting(W::Array{Word})
     [1//factorial(length(w)) for w in W]
 end
 
-#function rhs_taylor(W::Array{Word})
-#    G = degree.(collect(generators(W)))
-#    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
-#    T = Rational{Int}    
-#    n = length(W)
-#    c = zeros(T, n)
-#    W1 = [[degree(g) for g in w] for w in W]
-#    p = maximum([sum(w) for w in W1])
-#    for i=1:n
-#        w = W1[i]
-#        c[i] = one(T)/prod([sum(w[j:end]) for j=1:length(w)])
-#    end
-#    c
-#end    
-
-function coeff_u(w::Array{Int,1})       
-    l = length(w)
-    if l==0
-        return 1
+function rhs_taylor(W::Array{Word})
+    G = degree.(collect(generators(W)))
+    @assert length(G)==length(unique(G)) "Generators must have distinct degrees"
+    n = length(W)
+    c = zeros(Rational{Int}, n)
+    W1 = [[degree(g) for g in w] for w in W]
+    p = maximum([sum(w) for w in W1])
+    for i=1:n
+        w = W1[i]
+        c[i] = 1//prod([sum(w[j:end]) for j=1:length(w)])
     end
-    r = 0
-    for k=1:l
-        if w[k]>0
-            w1 = copy(w)
-            w1[k] -= 1
-            r += coeff_u(w1)
-        end        
-    end
-    if w[l]==0
-        r += coeff_u(w[1:l-1])
-    end
-    r
-end
-
-rhs_taylor(w::Array{Int,1}) = coeff_u(w)//factorial(sum(w+1))
-rhs_taylor(w::Word) = rhs_taylor([degree(c)-1 for c in w])
-rhs_taylor(W::Array{Word,1}) = rhs_taylor.(W)
-
+    c
+end    
 
 
 function rhs_taylor_symmetric(W::Array{Word})
