@@ -2,7 +2,7 @@ __precompile__()
 module Expocon
 
 import 
-Base: (*), /, +, -, show, convert, zero, one, expand, iszero, inv, diff
+Base: (*), /, +, -, show, convert, zero, one, expand, iszero, inv, diff, contains
 
 export MultiFor
 export Element, Generator, SimpleCommutator, Commutator
@@ -327,6 +327,20 @@ Base.size(w::Word) = size(w.w)
 Base.IndexStyle(::Type{<:Word}) = IndexLinear()
 Base.getindex(w::Word, i::Int) = w.w[i]
 Base.getindex(w::Word, i) = Word(w.w[i])
+
+function Base.contains{T}(y::Array{T,1}, x::Array{T,1})
+    lx = length(x)
+    ly = length(y)
+    for j=1:ly-lx+1
+        if x==y[j:j+lx-1]
+            return true                    
+        end
+    end
+    return false
+end
+
+Base.contains(y::Word, x::Word) = Base.contains(y.w, x.w)
+
 
 function Base.show(io::IO, w::Word) 
     if length(w)==0
