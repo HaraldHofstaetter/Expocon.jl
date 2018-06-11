@@ -11,6 +11,7 @@ export ZeroElement
 export terms, factors, exponent
 export Word
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
+export lyndon_factorization
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
 export is_id, is_lie_element, is_homogenous_lie_element
@@ -398,6 +399,36 @@ function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=fa
         end
     end
     sort(r, lt=(x,y)->degree(x)<degree(y))
+end
+
+function lyndon_factorization(w::Array{Int,1})
+    #taken from
+    #Sukhpal Singh Ghuman, Emanuele Giaquinta, Jorma Tarhio:
+    #Alternative Algorithms for Lyndon Factorization
+    #
+    f = Array{Int,1}[]
+    k = 0
+    while k<length(w)
+        i = k+1
+        j = k+2
+        while true
+            if j==length(w)+1 || w[j]<w[i]
+                while k<i
+                    push!(f, w[k+1:k+j-i])
+                    k = k+j-i                    
+                end
+                break
+            else
+                if w[j]>w[i]
+                    i = k+1
+                else
+                    i = i+1
+                end
+                j = j+1
+            end
+        end
+    end
+    f
 end
 
 
