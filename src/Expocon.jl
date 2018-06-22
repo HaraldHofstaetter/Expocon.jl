@@ -22,6 +22,7 @@ export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
+export BCH_coeff, BCH
 
 abstract type Element end
 
@@ -630,6 +631,13 @@ function rightnormed_bracketing(w::Word)
     SimpleCommutator(w[1], rightnormed_bracketing(w[2:end]))
 end
 
+function rightnormed_bracketing(e::Array{Element, 1})
+    if length(e) == 1
+        return e[1]
+    end
+    SimpleCommutator(e[1], rightnormed_bracketing(e[2:end]))
+end
+
 
 function rightnormed_basis(G::Array{Generator,1}, n::Integer; 
                       odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
@@ -653,11 +661,6 @@ end
 
 coeff(w::Word, t::Term) = t.c*coeff(w, t.e)
 coeff(w::Word, l::LinearCombination) = sum(coeff(w,t) for t in terms(l))
-
-function all_words(g::Array{Generator, 1}, n::Integer)
-    kk = fill(length(g)-1,n)
-    [Word([g[j+1] for j in jj]) for jj in MultiFor(kk)]
-end
 
 
 immutable MultiFor
@@ -684,6 +687,14 @@ function Base.next(MF::MultiFor, k::Array{Int,1})
             return (copy(k), k)
         end
     end            
+end
+
+
+function all_words(g::Array{Generator, 1}, n::Integer; odd_terms_only::Bool=false, 
+                      all_lower_terms::Bool=true, max_generator_order::Integer=n)
+    #TODO: implement max_generator_order
+    nn = [k for k in (all_lower_terms?1:n):n if !odd_terms_only || isodd(k)]
+    vcat([[Word([g[j+1] for j in jj]) for jj in MultiFor(fill(length(g)-1,n))] for n in nn]...)
 end
 
 
@@ -1052,6 +1063,32 @@ function composition(Phi::Product, g::Vector)
 end
 
 composition(Phi::Exponential, g::Vector) = composition(Product([Phi]), g)
+
+
+function coeff_BCH(G::Array{Generator,1},w::Word)
+    @assert length(G)==2 && G[1]!=G[2]
+    n = length(w)
+    x = [c==G[1]?1:0 for c in w]
+    y = 1-x
+    X = diagm(x,1)
+    Y = diagm(y,1)
+    eX = eye(Int,n+1)+sum([1//factorial(k)*X^k for k=1:n])
+    eY = eye(Int,n+1)+sum([1//factorial(k)*Y^k for k=1:n])
+    Q = eX*eY-eye(Int,n+1)
+    Z = sum([(-1)^(k+1)//k*Q^k for k=1:n])
+    z = Z[1,end]
+end
+
+
+function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)    
+    @assert length(G)==2 && G[1]!=G[2]
+    W = lyndon_words(G, p)
+    L = use_rightnormed_basis?rightnormed_basis(G, p):lyndon_basis(G, p)
+    Phi = inv([coeff(w,b)//1 for w in W, b in L])
+    c = Phi*[coeff_BCH(G,w) for w in W]
+    [c[j].*L[j] for j=1:length(c) if c[j]!=0]
+end
+
 
 
 end # Expocon
