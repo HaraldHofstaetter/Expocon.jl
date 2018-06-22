@@ -9,7 +9,7 @@ export Element, Generator, SimpleCommutator, Commutator
 export Exponential, Product, Id, Term, LinearCombination
 export ZeroElement
 export terms, factors, exponent
-export Word
+export Word, all_words
 export Lyndon, lyndon_words, lyndon_basis, lyndon_bracketing
 export rightnormed_words, rightnormed_basis, rightnormed_bracketing
 export extend_by_rightmost_subwords, leading_word
@@ -623,10 +623,17 @@ end
 coeff(w::Word, t::Term) = t.c*coeff(w, t.e)
 coeff(w::Word, l::LinearCombination) = sum(coeff(w,t) for t in terms(l))
 
+function all_words(g::Array{Generator, 1}, n::Integer)
+    kk = fill(length(g)-1,n)
+    [Word([g[j+1] for j in jj]) for jj in MultiFor(kk)]
+end
+
 
 immutable MultiFor
     k::Array{Int,1}
 end
+
+Base.length(MF::MultiFor) = prod(MF.k+1)
 
 Base.start(MF::MultiFor) = Int[]
 
