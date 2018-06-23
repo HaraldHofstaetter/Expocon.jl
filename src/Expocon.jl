@@ -511,9 +511,29 @@ function lyndon_basis(G::Array{Generator,1}, n::Integer;
                       odd_terms_only::Bool=false, all_lower_terms::Bool=true, 
                       max_generator_order::Integer=n) 
     W = lyndon_words(G, n)
-    [lyndon_bracketing(w, W) for w in W if
-     ((all_lower_terms && degree(w)<=n) || degree(w)==n) && (!odd_terms_only || isodd(degree(w))) &&
-     (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)]
+    m = length(W)
+    B = zeros(Element, m)
+    for j=1:m
+        w = W[j]
+        if length(w) == 1
+            B[j] = w[1]
+        else
+            k0 = 0
+            j1 = 0
+            for k=2:length(w)
+                j1 = findfirst(W, w[k:end])
+                if j1>0
+                    k0 = k
+                    break
+                end
+            end    
+            j2 = findfirst(W, w[1:k0-1])
+            B[j] = SimpleCommutator(B[j2], B[j1])
+        end
+    end
+    [B[j] for j=1:m if
+        ((all_lower_terms && degree(W[j])<=n) || degree(W[j])==n) && (!odd_terms_only || isodd(degree(W[j]))) &&
+        (max_generator_order>=n ||maximum([degree(g) for g in W[j]])<=max_generator_order)]
 end
 
 function analyze_lyndon_word(w::Array{Int,1})
