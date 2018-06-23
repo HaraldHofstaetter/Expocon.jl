@@ -22,7 +22,7 @@ export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
-export coeff_coeff, BCH
+export coeff_BCH, BCH
 
 abstract type Element end
 
