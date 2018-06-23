@@ -22,7 +22,7 @@ export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
-export BCH_coeff, BCH
+export coeff_coeff, BCH
 
 abstract type Element end
 
@@ -1078,7 +1078,7 @@ function exp_01_offdiag(x::Array{Int,1})
         if k<n
             bf = true
             for j=1:n-k
-                xx[j]*=x[k+j]
+                xx[j] *= x[k+j]
                 bf = bf && xx[j]==0
             end
             if bf
@@ -1088,7 +1088,6 @@ function exp_01_offdiag(x::Array{Int,1})
     end
     eX
 end
-
 
 function coeff_BCH(G::Array{Generator,1},w::Word)
     @assert length(G)==2 && G[1]!=G[2]
@@ -1109,21 +1108,6 @@ function coeff_BCH(G::Array{Generator,1},w::Word)
     end
     z[1]
 end
-
-function coeff_BCH(G::Array{Generator,1},w::Word)
-    @assert length(G)==2 && G[1]!=G[2]
-    n = length(w)
-    x = [c==G[1]?1:0 for c in w]
-    y = 1-x
-    X = diagm(x,1)
-    Y = diagm(y,1)
-    eX = eye(Int,n+1)+sum([1//factorial(k)*X^k for k=1:n])
-    eY = eye(Int,n+1)+sum([1//factorial(k)*Y^k for k=1:n])
-    Q = eX*eY-eye(Int,n+1)
-    Z = sum([(-1)^(k+1)//k*Q^k for k=1:n])
-    z = Z[1,end]
-end
-
 
 function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)    
     @assert length(G)==2 && G[1]!=G[2]
