@@ -1065,6 +1065,51 @@ end
 composition(Phi::Exponential, g::Vector) = composition(Product([Phi]), g)
 
 
+function exp_01_offdiag(x::Array{Int,1})
+    n = length(x)
+    f = 1
+    xx = x[:]
+    eX = eye(Rational{Int},n+1)
+    for k=1:n
+        f *= k
+        for j=1:n-k+1
+            eX[j,j+k] = xx[j]//f
+        end
+        if k<n
+            bf = true
+            for j=1:n-k
+                xx[j]*=x[k+j]
+                bf = bf && xx[j]==0
+            end
+            if bf
+                break
+            end
+        end
+    end
+    eX
+end
+
+
+function coeff_BCH(G::Array{Generator,1},w::Word)
+    @assert length(G)==2 && G[1]!=G[2]
+    n = length(w)
+    x = [c==G[1]?1:0 for c in w]
+    y = 1-x
+    eX = exp_01_offdiag(x)
+    eY = exp_01_offdiag(y)
+    Q = eX*eY
+    for j=1:n+1
+        Q[j,j] -= 1
+    end
+    q = Q[:,end]
+    z = q[:]
+    for k=2:n
+        q = Q*q
+        z += ((-1)^(k+1)//k)*q
+    end
+    z[1]
+end
+
 function coeff_BCH(G::Array{Generator,1},w::Word)
     @assert length(G)==2 && G[1]!=G[2]
     n = length(w)
