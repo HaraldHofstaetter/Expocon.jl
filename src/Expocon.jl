@@ -1159,6 +1159,27 @@ function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1
     z[1]
 end
 
+function coeff_BCH{T}(G::Array{Generator,1},w::Word, F::Array{T,2})
+    n = length(w)
+    Q = eye(T, n+1)
+    kk = [findfirst(G, c) for c in w]
+    for j=1:size(F, 1)
+        x = T[k!=0?F[j,k]:zero(T) for k in kk]
+        eX = exp_superdiagm(x)
+        Q = j==1?eX:Q*eX
+    end
+    for j=1:n+1
+        Q[j,j] -= 1
+    end
+    q = Q[:,end]
+    z = q[:]
+    for k=2:n
+        q = Q*q
+        z += ((-1)^(k+1)//k)*q
+    end
+    z[1]
+end
+
 
 function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)    
     @assert length(G)==2 && G[1]!=G[2]
