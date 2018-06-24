@@ -22,7 +22,7 @@ export generators, max_length, normalize_lie_elements
 export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
-export coeff_BCH, BCH
+export exp_superdiagm, coeff_BCH, BCH
 
 abstract type Element end
 
@@ -1085,15 +1085,21 @@ end
 composition(Phi::Exponential, g::Vector) = composition(Product([Phi]), g)
 
 
-function exp_01_offdiag(x::Array{Int,1})
+function exp_superdiagm{T}(x::Array{T,1})
     n = length(x)
     f = 1
     xx = x[:]
-    eX = eye(Rational{Int},n+1)
+    eX = eye(isa(T,Integer)?Rational{T}:T,n+1)
     for k=1:n
         f *= k
-        for j=1:n-k+1
-            eX[j,j+k] = xx[j]//f
+        if isa(T,Integer)
+            for j=1:n-k+1
+                eX[j,j+k] = xx[j]//f
+            end
+        else
+            for j=1:n-k+1
+                eX[j,j+k] = xx[j]/f
+            end
         end
         if k<n
             bf = true
@@ -1114,8 +1120,8 @@ function coeff_BCH(G::Array{Generator,1},w::Word)
     n = length(w)
     x = [c==G[1]?1:0 for c in w]
     y = 1-x
-    eX = exp_01_offdiag(x)
-    eY = exp_01_offdiag(y)
+    eX = exp_superdiagm(x)
+    eY = exp_superdiagm(y)
     Q = eX*eY
     for j=1:n+1
         Q[j,j] -= 1
@@ -1128,6 +1134,31 @@ function coeff_BCH(G::Array{Generator,1},w::Word)
     end
     z[1]
 end
+
+function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1})
+    @assert length(G)==2 && G[1]!=G[2]
+    @assert length(a)==length(b)
+    n = length(w)
+    Q = eye(T, n+1)
+    for j=1:length(a)
+        x = T[c==G[1]?a[j]:zero(T) for c in w]
+        y = T[c==G[2]?b[j]:zero(T) for c in w]
+        eX = exp_superdiagm(x)
+        eY = exp_superdiagm(y)
+        Q = j==1?eX*eY:Q*eX*eY
+    end
+    for j=1:n+1
+        Q[j,j] -= 1
+    end
+    q = Q[:,end]
+    z = q[:]
+    for k=2:n
+        q = Q*q
+        z += ((-1)^(k+1)//k)*q
+    end
+    z[1]
+end
+
 
 function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)    
     @assert length(G)==2 && G[1]!=G[2]
