@@ -1115,7 +1115,7 @@ function exp_superdiagm{T}(x::Array{T,1})
     eX
 end
 
-function coeff_BCH(G::Array{Generator,1},w::Word)
+function coeff_BCH(G::Array{Generator,1},w::Word; apply_log::Bool=true)
     @assert length(G)==2 && G[1]!=G[2]
     n = length(w)
     x = [c==G[1]?1:0 for c in w]
@@ -1123,6 +1123,9 @@ function coeff_BCH(G::Array{Generator,1},w::Word)
     eX = exp_superdiagm(x)
     eY = exp_superdiagm(y)
     Q = eX*eY
+    if !apply_log
+        return Q[1,end]
+    end
     for j=1:n+1
         Q[j,j] -= 1
     end
@@ -1135,7 +1138,7 @@ function coeff_BCH(G::Array{Generator,1},w::Word)
     z[1]
 end
 
-function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1})
+function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1}; apply_log::Bool=true)
     @assert length(G)==2 && G[1]!=G[2]
     @assert length(a)==length(b)
     n = length(w)
@@ -1147,6 +1150,9 @@ function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1
         eY = exp_superdiagm(y)
         Q = j==1?eX*eY:Q*eX*eY
     end
+    if !apply_log
+        return Q[1,end]
+    end
     for j=1:n+1
         Q[j,j] -= 1
     end
@@ -1159,7 +1165,7 @@ function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1
     z[1]
 end
 
-function coeff_BCH{T}(G::Array{Generator,1},w::Word, F::Array{T,2})
+function coeff_BCH{T}(G::Array{Generator,1},w::Word, F::Array{T,2}; apply_log::Bool=true)
     n = length(w)
     Q = eye(T, n+1)
     kk = [findfirst(G, c) for c in w]
@@ -1167,6 +1173,9 @@ function coeff_BCH{T}(G::Array{Generator,1},w::Word, F::Array{T,2})
         x = T[k!=0?F[j,k]:zero(T) for k in kk]
         eX = exp_superdiagm(x)
         Q = j==1?eX:Q*eX
+    end
+    if !apply_log
+        return Q[1,end]
     end
     for j=1:n+1
         Q[j,j] -= 1
