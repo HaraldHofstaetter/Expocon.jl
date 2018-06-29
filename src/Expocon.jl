@@ -1089,10 +1089,10 @@ function exp_superdiagm{T}(x::Array{T,1})
     n = length(x)
     f = 1
     xx = x[:]
-    eX = eye(isa(T,Integer)?Rational{T}:T,n+1)
+    eX = eye(T<:Integer?Rational{T}:T,n+1)
     for k=1:n
         f *= k
-        if isa(T,Integer)
+        if T<:Integer
             for j=1:n-k+1
                 eX[j,j+k] = xx[j]//f
             end
