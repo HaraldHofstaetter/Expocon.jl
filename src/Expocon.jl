@@ -23,6 +23,7 @@ export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
 export exp_superdiagm, coeff_BCH, BCH
+export hom
 
 abstract type Element end
 
@@ -1237,6 +1238,26 @@ function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)
     [c[j].*L[j] for j=1:length(c) if c[j]!=0]
 end
 
+hom(w::Word, g::Generator) = diagm([a==g?1:0 for a in w], 1)
+hom(w::Word, t::Term) = t.c*hom(w, t.e)
+hom(w::Word, l::LinearCombination) = sum([hom(w, t) for t in terms(l)])
+hom(w::Word, p::Product) = length(factors(p))==0?eye(Int,length(w)+1):prod([hom(w, f) for f in factors(p)])
+hom(w::Word, c::SimpleCommutator) = hom(w, c.x)*hom(w, c.y)-hom(w, c.y)*hom(w, c.x)
 
+function hom(w::Word, e::Exponential)
+    x = hom(w, e.e)
+    @assert norm(diag(x),Inf)==0 "exponent with constant term"
+    y = copy(x)
+    r = copy(x)
+    for k=2:length(w)+1
+        y = x*y
+        if iszero(y)
+            break
+        end
+        r += y*1//factorial(k)
+    end
+    r += eye(Int, length(w)+1)
+    r
+end
 
 end # Expocon
