@@ -442,11 +442,13 @@ function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=fa
         for w0 in Lyndon(2,n)
             if !first
                 w1 = lyndon_transform(w0)
-                w = Word(G[w1+1])
-                d = degree(w)
-                if   ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
-                    (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
-                    push!(r, w)
+                if maximum(w1)<s
+                    w = Word(G[w1+1])
+                    d = degree(w)
+                    if   ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
+                        (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
+                        push!(r, w)
+                    end
                 end
             end
             first = false
@@ -1246,7 +1248,7 @@ hom(w::Word, c::SimpleCommutator) = hom(w, c.x)*hom(w, c.y)-hom(w, c.y)*hom(w, c
 
 function hom(w::Word, e::Exponential)
     x = hom(w, e.e)
-    @assert norm(diag(x),Inf)==0 "exponent with constant term"
+    @assert iszero(diag(x)) "exponent with constant term"
     y = copy(x)
     r = copy(x)
     for k=2:length(w)
