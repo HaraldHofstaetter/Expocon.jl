@@ -23,7 +23,7 @@ export commute
 export rhs_splitting, rhs_taylor, rhs_taylor_symmetric, rhs_legendre
 export splitting_method, mult_t, composition
 export exp_superdiagm, coeff_BCH, BCH
-export hom
+export hom, logtriu
 
 abstract type Element end
 
@@ -1249,7 +1249,7 @@ function hom(w::Word, e::Exponential)
     @assert norm(diag(x),Inf)==0 "exponent with constant term"
     y = copy(x)
     r = copy(x)
-    for k=2:length(w)+1
+    for k=2:length(w)
         y = x*y
         if iszero(y)
             break
@@ -1258,6 +1258,31 @@ function hom(w::Word, e::Exponential)
     end
     r += eye(Int, length(w)+1)
     r
+end
+
+function logtriu(Q::Matrix; last_column_only::Bool=false)
+    n,m = size(Q)
+    @assert n==m "matrix must be square"    
+    @assert istriu(Q) && iszero(diag(Q)-1) "matrix must be upper triangular with unit diagonal"
+    Q = copy(Q)
+    for j=1:n
+        Q[j,j] = 0
+    end
+    if last_column_only
+        q = Q[:,end]
+        z = q[:]
+    else
+        q = copy(Q)
+        z = copy(Q)
+    end
+    for k=2:n
+        q = Q*q
+        if iszero(q)
+            break
+        end
+        z += ((-1)^(k+1)//k)*q
+    end
+    z
 end
 
 end # Expocon
