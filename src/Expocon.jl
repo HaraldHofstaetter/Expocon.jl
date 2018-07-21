@@ -400,17 +400,55 @@ function lyndon_words(s::Integer, n::Integer; odd_terms_only::Bool=false,
     sort(r, lt=(x,y)->length(x)<length(y))
 end
 
+function lyndon_transform(w::Array{Int,1})
+    w1 = Int[]
+    c = 0
+    for x in w[2:end]
+        if x==1
+            c += 1
+        else
+            push!(w1,c)
+            c = 0
+        end
+    end
+    push!(w1,c)
+    w1
+end
+
 function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=false, 
                       all_lower_terms::Bool=true, max_generator_order::Integer=n)
     s = length(G)
     @assert s==length(unique(G)) "Generators must be distinct"
     r = Word[]
-    for w0 in Lyndon(s,n)
-        w = Word(G[w0+1])
-        d = degree(w)
-        if  ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
-            (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
-            push!(r, w)
+    f = true
+    for j=1:s
+        if degree(G[j])!=j
+            f = false
+            break
+        end
+    end
+    if !f 
+       for w0 in Lyndon(s,n)
+            w = Word(G[w0+1])
+            d = degree(w)
+            if  ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
+                (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
+                push!(r, w)
+            end
+        end
+    else # if degree(G[j])==j for all j then this algorithm is much faster
+        first = true
+        for w0 in Lyndon(2,n)
+            if !first
+                w1 = lyndon_transform(w0)
+                w = Word(G[w1+1])
+                d = degree(w)
+                if   ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
+                    (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
+                    push!(r, w)
+                end
+            end
+            first = false
         end
     end
     sort(r, lt=(x,y)->degree(x)<degree(y))
