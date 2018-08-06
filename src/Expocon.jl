@@ -1262,6 +1262,37 @@ function hom(w::Word, e::Exponential)
     r
 end
 
+hom(w::Word, g::Generator, v::Vector) = vcat([w[j]==g?v[j+1]:0 for j=1:length(w)],0)
+hom(w::Word, t::Term, v::Vector) = t.c*hom(w, t.e, v)
+hom(w::Word, l::LinearCombination, v::Vector) = sum([hom(w, t, v) for t in terms(l)])
+
+function hom(w::Word, p::Product, v::Vector) 
+    v1 = copy(v)
+    for f in reverse(factors(p))
+        if iszero(v1)
+            return v1
+        end
+        v1 = hom(w, f, v1)
+    end
+    v1
+end
+
+hom(w::Word, c::SimpleCommutator, v::Vector) = hom(w, c.x, hom(w, c.y, v))-hom(w, c.y, hom(w, c.x, v))
+
+function hom(w::Word, e::Exponential, v::Vector)
+    y = copy(v)
+    r = copy(v)
+    for k=1:length(w)
+        y = hom(w, e.e, y)
+        if iszero(y)
+            return r
+        end
+        r += y*1//factorial(k)
+    end
+    r
+end
+
+
 function logtriu(Q::Matrix; last_column_only::Bool=false)
     n,m = size(Q)
     @assert n==m "matrix must be square"    
