@@ -151,8 +151,8 @@ is_id(p::Product) = length(factors(p))==0
 is_id(t::Term) = is_id(t.e)&&t.c==1
 
 
-*(c, e::Element) = c==1?e:Term(c,e)
-*(e::Element, c) = c==1?e:Term(c,e)
+*(c, e::Element) = c==1 ? e : Term(c,e)
+*(e::Element, c) = c==1 ? e : Term(c,e)
 *(c, t::Term) = (c*t.c)*t.e
 *(t::Term, c) = (c*t.c)*t.e
 #*(c, t::Term) = Term(c*t.c,t.e)
@@ -278,8 +278,8 @@ key(g::Generator) = ('G', g.name)
 key(e::Exponential) = ('E', key(e.e))
 key(t::Term) = ('T', t.c, key(t.e))
 key(c::SimpleCommutator) = ('C', key(c.x), key(c.y))
-key(p::Product) = (vcat('P', [key(f) for f in p.p])...)
-key(l::LinearCombination) = (vcat('L', sort([key(t) for t in terms(l)]))...)
+key(p::Product) = (vcat('P', [key(f) for f in p.p])...,)
+key(l::LinearCombination) = (vcat('L', sort([key(t) for t in terms(l)]))...,)
 
 simplify_sum(g::Generator) = g
 simplify_sum(e::Exponential) = Exponential(simplify_sum(e.e))
@@ -331,7 +331,7 @@ Base.IndexStyle(::Type{<:Word}) = IndexLinear()
 Base.getindex(w::Word, i::Int) = w.w[i]
 Base.getindex(w::Word, i) = Word(w.w[i])
 
-function Base.contains{T}(y::Array{T,1}, x::Array{T,1})
+function Base.contains(y::Array{T,1}, x::Array{T,1}) where T
     lx = length(x)
     ly = length(y)
     for j=1:ly-lx+1
@@ -365,7 +365,7 @@ end
 generators(w::Word)=Set(w)
 generators(W::Array{Word}) = union(generators.(W)...)
 
-immutable Lyndon
+struct Lyndon
     s::Int
     n::Int
 end
@@ -491,7 +491,7 @@ end
 Base.length(::Generator) = 1
 Base.length(t::Term) = length(t.e)
 Base.length(C::SimpleCommutator) = 
-    (isa(C.x, SimpleCommutator)?length(C.x):1)+(isa(C.y, SimpleCommutator)?length(C.y):1)
+    (isa(C.x, SimpleCommutator) ? length(C.x) : 1)+(isa(C.y, SimpleCommutator) ? length(C.y) : 1)
 
 degree(g::Generator) = g.degree
 degree(t::Term) = degree(t.e)
@@ -501,7 +501,7 @@ degree(w::Word) = sum([degree(g) for g in w])
 leading_word(C::Generator) = Word([C])
 leading_word(C::SimpleCommutator) = Word(vcat(leading_word(C.x), leading_word(C.y)))
 
-adjoint(g::Generator) = isodd(degree(g))?g:-g
+adjoint(g::Generator) = isodd(degree(g)) ? g : -g
 adjoint(p::Product) = Product(adjoint.(reverse(factors(p))))
 adjoint(e::Exponential) = Exponential(adjoint(e.e))
 adjoint(c::SimpleCommutator) = SimpleCommutator(adjoint(c.y), adjoint(c.x))        
@@ -511,7 +511,7 @@ adjoint(l::LinearCombination) = sum(adjoint.(terms(l)))
 inv(e::Element) = error("not inverible")
 inv(p::Product) = Product(reverse(inv.(factors(p))))
 inv(ex::Exponential) = Exponential(-exponent(ex))
-inv(t::Term) = (isa(t.c,Int)?1//t.c:1/t.c)*inv(t.e)
+inv(t::Term) = (isa(t.c,Int) ? 1//t.c : 1/t.c)*inv(t.e)
 
 diff(g::Generator) = degree(g)*g
 diff(t::Term) = t.c*diff(t.e)
@@ -708,7 +708,7 @@ function rightnormed_basis(G::Array{Generator,1}, n::Integer;
     [rightnormed_bracketing(w) for w in W]
 end
 
-coeff(w::Word, g::Generator) = length(w)==1&&w[1]==g?1:0
+coeff(w::Word, g::Generator) = length(w)==1&&w[1]==g ? 1 : 0
 
 function coeff(w::Word, c::SimpleCommutator)
     lx = length(c.x)
@@ -724,7 +724,7 @@ coeff(w::Word, t::Term) = t.c*coeff(w, t.e)
 coeff(w::Word, l::LinearCombination) = sum(coeff(w,t) for t in terms(l))
 
 
-immutable MultiFor
+struct MultiFor
     k::Array{Int,1}
 end
 
@@ -754,7 +754,7 @@ end
 function all_words(g::Array{Generator, 1}, n::Integer; odd_terms_only::Bool=false, 
                       all_lower_terms::Bool=true, max_generator_order::Integer=n)
     #TODO: implement max_generator_order
-    nn = [k for k in (all_lower_terms?1:n):n if !odd_terms_only || isodd(k)]
+    nn = [k for k in (all_lower_terms ? 1 : n):n if !odd_terms_only || isodd(k)]
     vcat([[Word([g[j+1] for j in jj]) for jj in MultiFor(fill(length(g)-1,n))] for n in nn]...)
 end
 
@@ -770,7 +770,7 @@ is_homogenous_lie_element(l::LinearCombination) = is_lie_element(l) && (length(l
 
 function degree(l::LinearCombination)
     @assert is_homogenous_lie_element(l) "homogenous lie element expected"
-    length(l.l)==0?-1:degree(l.l[1])
+    length(l.l)==0 ? -1 : degree(l.l[1])
 end
 
 generators(g::Generator)=Set([g])
@@ -1041,7 +1041,7 @@ function rhs_taylor_symmetric(W::Array{Word})
     c = zeros(T, n)
     W1 = [[degree(g) for g in w] for w in W]
     p = maximum([sum(w) for w in W1])
-    Cinv = T[(-1)^(m+n)*(n>=m?binomial(n,m)//2^(n-m):0) for m=0:p-1, n=0:p-1]
+    Cinv = T[(-1)^(m+n)*(n>=m ? binomial(n,m)//2^(n-m) : 0) for m=0:p-1, n=0:p-1]
     for i=1:n
         w = W1[i]
         l = length(w)
@@ -1126,11 +1126,11 @@ end
 composition(Phi::Exponential, g::Vector) = composition(Product([Phi]), g)
 
 
-function exp_superdiagm{T}(x::Array{T,1})
+function exp_superdiagm(x::Array{T,1}) where T
     n = length(x)
     f = 1
     xx = x[:]
-    eX = eye(T<:Integer?Rational{T}:T,n+1)
+    eX = eye(T <: Integer ? Rational{T} : T,n+1)
     for k=1:n
         f *= k
         if T<:Integer
@@ -1159,7 +1159,7 @@ end
 function coeff_BCH(G::Array{Generator,1},w::Word; apply_log::Bool=true)
     @assert length(G)==2 && G[1]!=G[2]
     n = length(w)
-    x = [c==G[1]?1:0 for c in w]
+    x = [c==G[1] ? 1 : 0 for c in w]
     y = 1-x
     eX = exp_superdiagm(x)
     eY = exp_superdiagm(y)
@@ -1179,17 +1179,17 @@ function coeff_BCH(G::Array{Generator,1},w::Word; apply_log::Bool=true)
     z[1]
 end
 
-function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1}; apply_log::Bool=true)
+function coeff_BCH(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1}; apply_log::Bool=true) where T
     @assert length(G)==2 && G[1]!=G[2]
     @assert length(a)==length(b)
     n = length(w)
     Q = eye(T, n+1)
     for j=1:length(a)
-        x = T[c==G[1]?a[j]:zero(T) for c in w]
-        y = T[c==G[2]?b[j]:zero(T) for c in w]
+        x = T[c==G[1] ? a[j] : zero(T) for c in w]
+        y = T[c==G[2] ? b[j] : zero(T) for c in w]
         eX = exp_superdiagm(x)
         eY = exp_superdiagm(y)
-        Q = j==1?eX*eY:Q*eX*eY
+        Q = j==1 ? eX*eY : Q*eX*eY
     end
     if !apply_log
         return Q[1,end]
@@ -1206,14 +1206,14 @@ function coeff_BCH{T}(G::Array{Generator,1},w::Word, a::Array{T,1}, b::Array{T,1
     z[1]
 end
 
-function coeff_BCH{T}(G::Array{Generator,1},w::Word, F::Array{T,2}; apply_log::Bool=true)
+function coeff_BCH(G::Array{Generator,1},w::Word, F::Array{T,2}; apply_log::Bool=true) where T
     n = length(w)
     Q = eye(T, n+1)
     kk = [findfirst(G, c) for c in w]
     for j=1:size(F, 1)
-        x = T[k!=0?F[j,k]:zero(T) for k in kk]
+        x = T[k!=0 ? F[j,k] : zero(T) for k in kk]
         eX = exp_superdiagm(x)
-        Q = j==1?eX:Q*eX
+        Q = j==1 ? eX : Q*eX
     end
     if !apply_log
         return Q[1,end]
@@ -1234,16 +1234,16 @@ end
 function BCH(G::Array{Generator,1}, p::Int; use_rightnormed_basis::Bool=false)    
     @assert length(G)==2 && G[1]!=G[2]
     W = lyndon_words(G, p)
-    L = use_rightnormed_basis?rightnormed_basis(G, p):lyndon_basis(G, p)
+    L = use_rightnormed_basis ? rightnormed_basis(G, p) : lyndon_basis(G, p)
     Phi = inv([coeff(w,b)//1 for w in W, b in L])
     c = Phi*[coeff_BCH(G,w) for w in W]
     [c[j].*L[j] for j=1:length(c) if c[j]!=0]
 end
 
-hom(w::Word, g::Generator) = diagm([a==g?1:0 for a in w], 1)
+hom(w::Word, g::Generator) = diagm([a==g ? 1 : 0 for a in w], 1)
 hom(w::Word, t::Term) = t.c*hom(w, t.e)
 hom(w::Word, l::LinearCombination) = sum([hom(w, t) for t in terms(l)])
-hom(w::Word, p::Product) = length(factors(p))==0?eye(Int,length(w)+1):prod([hom(w, f) for f in factors(p)])
+hom(w::Word, p::Product) = length(factors(p))==0 ? eye(Int,length(w)+1) : prod([hom(w, f) for f in factors(p)])
 hom(w::Word, c::SimpleCommutator) = hom(w, c.x)*hom(w, c.y)-hom(w, c.y)*hom(w, c.x)
 
 function hom(w::Word, e::Exponential)
@@ -1262,7 +1262,7 @@ function hom(w::Word, e::Exponential)
     r
 end
 
-hom(w::Word, g::Generator, v::Vector) = vcat([w[j]==g?v[j+1]:0 for j=1:length(w)],0)
+hom(w::Word, g::Generator, v::Vector) = vcat([w[j]==g ? v[j+1] : 0 for j=1:length(w)],0)
 hom(w::Word, t::Term, v::Vector) = t.c*hom(w, t.e, v)
 hom(w::Word, l::LinearCombination, v::Vector) = sum([hom(w, t, v) for t in terms(l)])
 
