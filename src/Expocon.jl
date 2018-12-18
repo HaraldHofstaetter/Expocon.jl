@@ -443,7 +443,7 @@ function lyndon_words(G::Array{Generator,1}, n::Integer; odd_terms_only::Bool=fa
             if !first
                 w1 = lyndon_transform(w0)
                 if maximum(w1)<s
-                    w = Word(G[w1+1])
+                    w = Word(G[w1 .+ 1])
                     d = degree(w)
                     if   ((all_lower_terms && d<=n) || d==n) && (!odd_terms_only || isodd(d)) &&
                         (max_generator_order>=n ||maximum([degree(g) for g in w])<=max_generator_order)
@@ -708,21 +708,6 @@ function rightnormed_basis(G::Array{Generator,1}, n::Integer;
     [rightnormed_bracketing(w) for w in W]
 end
 
-coeff(w::Word, g::Generator) = length(w)==1&&w[1]==g ? 1 : 0
-
-function coeff(w::Word, c::SimpleCommutator)
-    lx = length(c.x)
-    ly = length(c.y)
-    if lx+ly != length(w)
-        return 0
-    end
-    (coeff(w[1:lx], c.x)*coeff(w[lx+1:end], c.y) -
-     coeff(w[1:ly], c.y)*coeff(w[ly+1:end], c.x))
-end
-
-coeff(w::Word, t::Term) = t.c*coeff(w, t.e)
-coeff(w::Word, l::LinearCombination) = sum(coeff(w,t) for t in terms(l))
-
 
 struct MultiFor
     k::Array{Int,1}
@@ -951,65 +936,6 @@ end
 simplify(e::Element) = normalize_lie_elements(e)
 simplify(t::Term) = t.c*simplify(t.e)
 simplify(l::LinearCombination) = simplify_sum(sum([expand(simplify(t)) for t in terms(l)]))
-
-
-function coeff(w::Word, e::Exponential)
-    @assert is_lie_element(e.e) "lie element in exponent expected"
-    r = length(w)
-    if r==0
-        return 1
-    end
-    tt = terms(e.e)
-    K = length(tt)
-    C = [t.e for t in tt]
-    x = [t.c for t in tt]
-    l = length.(C)
-    Q = div(r, minimum(l))
-    c = 0
-    for q = 1:Q
-        for k = MultiFor((K-1)*ones(Int,q))
-            cc = 0
-            s = sum([l[k1+1] for k1 in k])
-            if s==r
-                cc = 1
-                ll=1
-                for k1 in k                
-                    cc *= x[k1+1]*coeff(w[ll:ll+l[k1+1]-1], C[k1+1]) 
-                    ll += l[k1+1]
-                end        
-            end     
-            c += cc*(1//factorial(q))
-        end
-    end
-    c
-end
-
-function coeffs(W::Array{Word, 1}, p::Product)
-    W1 = extend_by_rightmost_subwords(W)
-    m = length(W1)
-    f = reverse(factors(p))
-    J = length(f)
-    M = Any[0 for i=1:m, j=1:m]
-    c = Any[0 for i=1:m]
-    c[1] = 1
-    for j=1:J
-        for k=1:m
-            for l=1:m
-                r = length(W1[k])-length(W1[l])
-                if r>=0 && W1[k][r+1:end]==W1[l]
-                    w = W1[k][1:r]
-                    M[k,l]  = coeff(w, f[j])
-                end
-            end
-        end 
-        c = M*c
-    end   
-    c = [c[findfirst(W1, w)] for w in W]
-end    
-
-coeff(w::Word, p::Product) = coeffs([w], p)[1]
-
-coeffs(W::Array{Word,1}, e::Element) = [coeff(w, e) for w in W]
 
 
 function rhs_splitting(W::Array{Word}) 
@@ -1263,7 +1189,7 @@ function hom(w::Word, e::Exponential)
 end
 
 hom(w::Word, g::Generator, v::Vector) = vcat([w[j]==g ? v[j+1] : 0 for j=1:length(w)],0)
-hom(w::Word, t::Term, v::Vector) = t.c*hom(w, t.e, v)
+hom(w::Word, t::Term, v::Vector) = t.c .* hom(w, t.e, v)
 hom(w::Word, l::LinearCombination, v::Vector) = sum([hom(w, t, v) for t in terms(l)])
 
 function hom(w::Word, p::Product, v::Vector) 
@@ -1291,6 +1217,9 @@ function hom(w::Word, e::Exponential, v::Vector)
     end
     r
 end
+
+coeff(w::Word, S::Element) = hom(w, S, vcat(zeros(Int,length(w)), 1))[1] 
+coeffs(W::Array{Word,1}, S::Element) = [coeff(w, S) for w in W]
 
 
 function logtriu(Q::Matrix; last_column_only::Bool=false)
